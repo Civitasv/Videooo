@@ -494,13 +494,16 @@ export class ProjectStore {
     return readJson<QaReport>(this.qaReportPath(runId))
   }
 
-  async acceptDraftAsFinal(): Promise<void> {
-    const info = await stat(this.draftRenderPath)
+  async acceptRenderAsFinal(
+    sourcePath = this.draftRenderPath,
+  ): Promise<void> {
+    const absoluteSource = resolve(sourcePath)
+    const info = await stat(absoluteSource)
     if (!info.isFile() || info.size <= 0) {
-      throw new Error('Draft render is missing or empty')
+      throw new Error('Accepted render is missing or empty')
     }
     await mkdir(this.rendersDirectory, { recursive: true })
-    await copyFile(this.draftRenderPath, this.finalRenderPath)
+    await copyFile(absoluteSource, this.finalRenderPath)
   }
 }
 
