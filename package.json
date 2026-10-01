@@ -20,6 +20,7 @@
     "render:smoke": "pnpm build && node scripts/render-smoke.mjs",
     "mixed:smoke": "pnpm build && node scripts/mixed-render-smoke.mjs",
     "qa:smoke": "pnpm build && node scripts/qa-smoke.mjs",
+    "previs:smoke": "pnpm build && node scripts/previs-smoke.mjs",
     "videooo": "node apps/cli/.build/index.js"
   },
   "devDependencies": {
