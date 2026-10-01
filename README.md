@@ -45,6 +45,35 @@ videooo --version
 
 If pnpm reports that its global bin directory is not configured, run `pnpm setup`, restart the shell, and rerun `pnpm install:cli`.
 
+### One-time local narration setup
+
+M2 uses local whisper.cpp by default. On macOS with Homebrew:
+
+```bash
+brew install ffmpeg whisper.cpp
+```
+
+Download a GGML whisper.cpp model from the official model collection, then either pass it per command:
+
+```bash
+videooo align --provider whisper-cpp --model /path/to/ggml-model.bin
+```
+
+or configure it once for your shell:
+
+```bash
+export VIDEOOO_WHISPER_CPP_MODEL=/path/to/ggml-model.bin
+```
+
+Optional binary overrides:
+
+```bash
+export VIDEOOO_WHISPER_CPP_BIN=/path/to/whisper-cli
+export VIDEOOO_FFMPEG_BIN=/path/to/ffmpeg
+```
+
+The default M2 path is local-only: narration audio is not uploaded to a cloud transcription service.
+
 Add the Videooo marketplace to Codex:
 
 ```bash
@@ -95,7 +124,7 @@ The installed plugin, CLI, skills, and future renderers are shared. They are not
 
 ## Current milestone
 
-M1 is implemented:
+M2 is implemented:
 
 ```text
 Topic
@@ -103,11 +132,15 @@ Topic
   -> Draft Script
   -> Human + AI revisions
   -> Explicit approved script
+  -> Human narration
+  -> Local/provider-neutral transcript
+  -> Forced alignment
+  -> Word/phrase timing + deviations + pauses
 ```
 
-The main Codex entry point is the packaged `videooo` skill. It reads `videooo status` and routes the current project to the focused `research` or `script` skill.
+The main Codex entry point is the packaged `videooo` skill. It routes research/script work and, after approval, delegates recording/transcription/alignment to the `narration` skill.
 
-When the project reaches `approved`, the current implementation stops at the M2 boundary: record the narration next.
+After state becomes `aligned`, Videooo is ready for M3: storyboard and Scene IR generation from the real narration timeline.
 
 ## CLI
 
@@ -128,6 +161,16 @@ videooo script import script-v1.json
 videooo script list
 videooo script show 1
 videooo script approve 1
+
+videooo narration add narration.m4a
+videooo narration show
+
+videooo transcript import transcript.json
+videooo transcript show
+
+videooo align --provider whisper-cpp --model /path/to/model.bin
+videooo align --from-transcript
+videooo alignment show
 ```
 
 Codex normally calls these commands through Videooo skills. You can also use them directly.
@@ -167,7 +210,10 @@ Remotion owns the final composition and global timeline. Manim is a specialized 
 - `.codex-plugin/plugin.json` — Codex compatibility metadata.
 - `skills/` — packaged, vendor-neutral production skills.
 - `apps/cli` — deterministic CLI.
-- `packages/domain` — canonical project, script, timing, and Scene IR contracts.
+- `packages/domain` — canonical project, script, narration, timing, and Scene IR contracts.
+- `packages/alignment` — deterministic script/audio forced alignment.
+- `packages/transcription` — provider-neutral transcription contract.
+- `packages/transcriber-whisper-cpp` — local whisper.cpp + ffmpeg adapter.
 - `packages/workflow` — production state machine and validators.
 - `packages/project-store` — filesystem project persistence.
 - `packages/core` — stable public facade.
@@ -175,6 +221,7 @@ Remotion owns the final composition and global timeline. Manim is a specialized 
 - `packages/renderer-manim` — Manim adapter boundary.
 - `docs/specs/v1.md` — full V1 product specification.
 - `docs/specs/m1.5-codex-distribution.md` — Codex distribution specification.
+- `docs/specs/m2-narration-alignment.md` — human narration and alignment specification.
 
 ## Development
 
