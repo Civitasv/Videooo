@@ -51,7 +51,7 @@ export function runSelfUpdate(
   const git = process.platform === 'win32' ? 'git.exe' : 'git'
   const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
   const videooo = process.platform === 'win32' ? 'videooo.cmd' : 'videooo'
-  const codex = process.platform === 'win32' ? 'codex.exe' : 'codex'
+  const codex = process.platform === 'win32' ? 'codex.cmd' : 'codex'
 
   requireCommand(runner, git, ['--version'], root, 'git')
   requireCommand(runner, pnpm, ['--version'], root, 'pnpm')
