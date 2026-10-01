@@ -1,0 +1,27 @@
+{
+  "name": "videooo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": "^22.20.0 || >=24.0.0"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "typecheck": "tsc -b --pretty false",
+    "lint": "oxlint packages apps scripts",
+    "test": "vitest run",
+    "skills:check": "node scripts/validate-skills.mjs",
+    "check": "pnpm skills:check && pnpm typecheck && pnpm lint && pnpm test",
+    "videooo": "node apps/cli/.build/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "oxlint": "1.76.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  }
+}
