@@ -9,6 +9,7 @@
     "@videooo/alignment": "workspace:*",
     "@videooo/domain": "workspace:*",
     "@videooo/project-store": "workspace:*",
+    "@videooo/qa": "workspace:*",
     "@videooo/storyboard": "workspace:*",
     "@videooo/workflow": "workspace:*"
   }
