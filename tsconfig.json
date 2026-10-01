@@ -3,6 +3,8 @@
   "references": [
     { "path": "./packages/domain" },
     { "path": "./packages/alignment" },
+    { "path": "./packages/transcription" },
+    { "path": "./packages/transcriber-whisper-cpp" },
     { "path": "./packages/project-store" },
     { "path": "./packages/workflow" },
     { "path": "./packages/core" },
