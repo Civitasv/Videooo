@@ -1,0 +1,12 @@
+{
+  "name": "@videooo/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "videooo": "./.build/index.js"
+  },
+  "dependencies": {
+    "@videooo/core": "workspace:*"
+  }
+}

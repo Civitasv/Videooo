@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/domain" },
+    { "path": "./packages/workflow" },
+    { "path": "./packages/core" },
+    { "path": "./packages/renderer-remotion" },
+    { "path": "./packages/renderer-manim" },
+    { "path": "./apps/cli" }
+  ]
+}

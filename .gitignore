@@ -1,0 +1,12 @@
+node_modules/
+.build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+.videooo/cache/
+.videooo/renders/
+.videooo/tmp/
