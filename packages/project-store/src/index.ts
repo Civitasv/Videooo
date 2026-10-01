@@ -1,19 +1,31 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
+import { createReadStream } from 'node:fs'
 import {
   access,
+  copyFile,
   mkdir,
   readFile,
   readdir,
   rename,
   rm,
+  stat,
   writeFile,
 } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { basename, dirname, extname, resolve } from 'node:path'
 import type {
+  NarrationAlignment,
+  NarrationAsset,
   ResearchPack,
   ScriptVersion,
+  TranscriptArtifact,
   VideoProjectManifest,
 } from '@videooo/domain'
+
+export interface ImportNarrationInput {
+  projectId: string
+  scriptVersionId: string
+  importedAt?: string
+}
 
 export class ProjectStore {
   readonly directory: string
@@ -34,11 +46,38 @@ export class ProjectStore {
     return resolve(this.directory, 'scripts')
   }
 
+  get narrationDirectory(): string {
+    return resolve(this.directory, 'narration')
+  }
+
+  get narrationMetadataPath(): string {
+    return resolve(this.narrationDirectory, 'narration.json')
+  }
+
+  get normalizedNarrationPath(): string {
+    return resolve(this.narrationDirectory, 'normalized.wav')
+  }
+
+  get transcriptPath(): string {
+    return resolve(this.narrationDirectory, 'transcript.json')
+  }
+
+  get alignmentPath(): string {
+    return resolve(this.narrationDirectory, 'alignment.json')
+  }
+
+  narrationSourcePath(asset: NarrationAsset): string {
+    return resolve(this.narrationDirectory, asset.storedFileName)
+  }
+
   scriptPath(version: number): string {
     if (!Number.isInteger(version) || version < 1) {
       throw new Error('Script version must be a positive integer')
     }
-    return resolve(this.scriptsDirectory, `v${String(version).padStart(3, '0')}.json`)
+    return resolve(
+      this.scriptsDirectory,
+      `v${String(version).padStart(3, '0')}.json`,
+    )
   }
 
   async initialize(project: VideoProjectManifest): Promise<void> {
@@ -105,6 +144,14 @@ export class ProjectStore {
     return latest === undefined ? null : this.loadScriptVersion(latest)
   }
 
+  async loadScriptVersionById(id: string): Promise<ScriptVersion> {
+    for (const version of await this.listScriptVersions()) {
+      const script = await this.loadScriptVersion(version)
+      if (script.id === id) return script
+    }
+    throw new Error(`Script version "${id}" does not exist`)
+  }
+
   async appendScriptVersion(script: ScriptVersion): Promise<void> {
     const path = this.scriptPath(script.version)
     if (await pathExists(path)) {
@@ -112,6 +159,98 @@ export class ProjectStore {
     }
 
     await writeJsonAtomic(path, script)
+  }
+
+  async hasNarration(): Promise<boolean> {
+    return pathExists(this.narrationMetadataPath)
+  }
+
+  async importNarrationSource(
+    sourcePath: string,
+    input: ImportNarrationInput,
+  ): Promise<NarrationAsset> {
+    if (await this.hasNarration()) {
+      throw new Error('Narration already exists; M2 does not replace narration')
+    }
+
+    const absoluteSource = resolve(sourcePath)
+    const sourceStat = await stat(absoluteSource)
+    if (!sourceStat.isFile()) {
+      throw new Error('Narration source must be a regular file')
+    }
+
+    const extension = safeExtension(absoluteSource)
+    const storedFileName = `source${extension}`
+    const targetPath = resolve(this.narrationDirectory, storedFileName)
+    const temporaryPath = `${targetPath}.${randomUUID()}.tmp`
+    const sha256 = await sha256File(absoluteSource)
+
+    const asset: NarrationAsset = {
+      schemaVersion: 1,
+      id: `narration-${sha256.slice(0, 16)}`,
+      projectId: input.projectId,
+      scriptVersionId: input.scriptVersionId,
+      importedAt: input.importedAt ?? new Date().toISOString(),
+      sourceFileName: basename(absoluteSource),
+      storedFileName,
+      sha256,
+      byteLength: sourceStat.size,
+      ...(mediaTypeForExtension(extension) === undefined
+        ? {}
+        : { mediaType: mediaTypeForExtension(extension) }),
+    }
+
+    await mkdir(this.narrationDirectory, { recursive: true })
+    try {
+      await copyFile(absoluteSource, temporaryPath)
+      await rename(temporaryPath, targetPath)
+      await writeJsonAtomic(this.narrationMetadataPath, asset)
+    } catch (error) {
+      await rm(temporaryPath, { force: true })
+      if (!(await pathExists(this.narrationMetadataPath))) {
+        await rm(targetPath, { force: true })
+      }
+      throw error
+    }
+
+    return asset
+  }
+
+  async loadNarration(): Promise<NarrationAsset> {
+    return readJson<NarrationAsset>(this.narrationMetadataPath)
+  }
+
+  async hasTranscript(): Promise<boolean> {
+    return pathExists(this.transcriptPath)
+  }
+
+  async saveTranscript(transcript: TranscriptArtifact): Promise<void> {
+    if (await this.hasTranscript()) {
+      throw new Error('Transcript already exists; M2 does not replace transcript')
+    }
+    await writeJsonAtomic(this.transcriptPath, transcript)
+  }
+
+  async loadTranscript(): Promise<TranscriptArtifact> {
+    return readJson<TranscriptArtifact>(this.transcriptPath)
+  }
+
+  async hasAlignment(): Promise<boolean> {
+    return pathExists(this.alignmentPath)
+  }
+
+  async saveAlignment(
+    alignment: NarrationAlignment,
+    options: { replace?: boolean } = {},
+  ): Promise<void> {
+    if ((await this.hasAlignment()) && options.replace !== true) {
+      throw new Error('Alignment already exists')
+    }
+    await writeJsonAtomic(this.alignmentPath, alignment)
+  }
+
+  async loadAlignment(): Promise<NarrationAlignment> {
+    return readJson<NarrationAlignment>(this.alignmentPath)
   }
 }
 
@@ -140,5 +279,40 @@ async function pathExists(path: string): Promise<boolean> {
     return true
   } catch {
     return false
+  }
+}
+
+async function sha256File(path: string): Promise<string> {
+  const hash = createHash('sha256')
+  const stream = createReadStream(path)
+
+  for await (const chunk of stream) {
+    hash.update(chunk)
+  }
+
+  return hash.digest('hex')
+}
+
+function safeExtension(path: string): string {
+  const extension = extname(path).toLowerCase()
+  return /^\.[a-z0-9]{1,10}$/.test(extension) ? extension : '.audio'
+}
+
+function mediaTypeForExtension(extension: string): string | undefined {
+  switch (extension) {
+    case '.wav':
+      return 'audio/wav'
+    case '.mp3':
+      return 'audio/mpeg'
+    case '.m4a':
+      return 'audio/mp4'
+    case '.aac':
+      return 'audio/aac'
+    case '.flac':
+      return 'audio/flac'
+    case '.ogg':
+      return 'audio/ogg'
+    default:
+      return undefined
   }
 }
