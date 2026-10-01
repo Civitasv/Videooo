@@ -43,7 +43,9 @@ export function VideoooComposition(props: VideoooRenderProps) {
               scene={scene}
               style={props.style}
               durationInFrames={plan.durationInFrames}
-              manimAsset={props.manimAssets[scene.id]}
+              {...(props.manimAssets[scene.id] === undefined
+                ? {}
+                : { manimAsset: props.manimAssets[scene.id] })}
             />
           </Sequence>
         )
