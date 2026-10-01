@@ -17,6 +17,7 @@
     "skills:check": "node scripts/validate-skills.mjs",
     "check": "pnpm skills:check && pnpm typecheck && pnpm lint && pnpm test",
     "install:cli": "node scripts/install-cli.mjs",
+    "render:smoke": "pnpm build && node scripts/render-smoke.mjs",
     "videooo": "node apps/cli/.build/index.js"
   },
   "devDependencies": {
