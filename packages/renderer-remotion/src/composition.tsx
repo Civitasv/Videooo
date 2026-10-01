@@ -1,4 +1,4 @@
-import { Audio } from '@remotion/media'
+import { Audio, Video } from '@remotion/media'
 import {
   AbsoluteFill,
   Sequence,
@@ -43,6 +43,7 @@ export function VideoooComposition(props: VideoooRenderProps) {
               scene={scene}
               style={props.style}
               durationInFrames={plan.durationInFrames}
+              manimAsset={props.manimAssets[scene.id]}
             />
           </Sequence>
         )
@@ -57,13 +58,36 @@ function SceneFrame({
   scene,
   style,
   durationInFrames,
+  manimAsset,
 }: {
   scene: SceneIR
   style: VideoStyle
   durationInFrames: number
+  manimAsset?: string
 }) {
   const frame = useCurrentFrame()
   const motion = sceneMotion(scene, frame, durationInFrames)
+
+  if (scene.renderer === 'manim') {
+    if (manimAsset === undefined) {
+      throw new Error(`Missing Manim media for scene "${scene.id}"`)
+    }
+    return (
+      <AbsoluteFill
+        style={{
+          backgroundColor: style.background,
+          opacity: motion.opacity,
+          transform: `translateY(${motion.translateY}px)`,
+        }}
+      >
+        <Video
+          src={staticFile(manimAsset)}
+          muted
+          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+        />
+      </AbsoluteFill>
+    )
+  }
 
   return (
     <AbsoluteFill
