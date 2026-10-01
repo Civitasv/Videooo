@@ -681,6 +681,31 @@ async function handleRender(args: string[]): Promise<void> {
     throw new Error('Compiled Scene IR count does not match project metadata')
   }
 
+  const manimSceneAssets: Record<string, string> = {}
+  const manimScenes = scenes.filter((scene) => scene.renderer === 'manim')
+  if (manimScenes.length > 0) {
+    const manimBinary = optionValue(args, '--manim-bin')
+    const ffprobeBinary = optionValue(args, '--ffprobe')
+    const worker = new ManimWorker({
+      ...(manimBinary === undefined ? {} : { binary: manimBinary }),
+      ...(ffprobeBinary === undefined ? {} : { ffprobeBinary }),
+    })
+
+    for (const scene of manimScenes) {
+      const asset = await renderOneManimScene(
+        worker,
+        store,
+        scene,
+        storyboard.video,
+        style,
+      )
+      manimSceneAssets[scene.id] = resolve(
+        store.sceneRendersDirectory,
+        asset.fileName,
+      )
+    }
+  }
+
   const requestedOutput = optionValue(args, '--output')
   const outputLocation =
     requestedOutput === undefined
@@ -695,6 +720,7 @@ async function handleRender(args: string[]): Promise<void> {
     narrationSourcePath: store.narrationSourcePath(narration),
     workspaceDirectory: store.renderWorkspaceDirectory,
     outputLocation,
+    manimSceneAssets,
   })
 
   const manifest = {
@@ -795,7 +821,7 @@ Usage:
   videooo manim check [--manim-bin <path>]
   videooo manim render <scene-id> [--manim-bin <path>]
   videooo manim render-all [--manim-bin <path>]
-  videooo render [--output <file>]`)
+  videooo render [--output <file>] [--manim-bin <path>] [--ffprobe <path>]`)
 }
 
 try {
