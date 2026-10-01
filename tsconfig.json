@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/domain" },
+    { "path": "./packages/alignment" },
     { "path": "./packages/project-store" },
     { "path": "./packages/workflow" },
     { "path": "./packages/core" },
