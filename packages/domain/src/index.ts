@@ -388,6 +388,22 @@ export interface SceneIR {
   transition: SceneTransition
 }
 
+export interface VideoRenderManifest {
+  schemaVersion: 1
+  id: string
+  projectId: string
+  storyboardId: string
+  alignmentId: string
+  createdAt: string
+  renderer: 'remotion'
+  outputPath: string
+  width: number
+  height: number
+  fps: number
+  durationMs: number
+  codec: 'h264'
+}
+
 export interface RenderArtifact {
   sceneId: string
   renderer: RendererKind
