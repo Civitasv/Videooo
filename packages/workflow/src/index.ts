@@ -398,7 +398,11 @@ function validateScriptShape(value: unknown): string[] {
   requireString(value.researchPackId, 'researchPackId', issues)
   requireString(value.createdAt, 'createdAt', issues)
 
-  if (\n    typeof value.version !== 'number' ||\n    !Number.isInteger(value.version) ||\n    value.version < 1\n  ) {
+  if (
+    typeof value.version !== 'number' ||
+    !Number.isInteger(value.version) ||
+    value.version < 1
+  ) {
     issues.push('version must be a positive integer')
   }
   if (value.parentVersionId !== undefined) {
