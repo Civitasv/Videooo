@@ -2,6 +2,7 @@
 
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { WhisperCppTranscriber } from '@videooo/transcriber-whisper-cpp'
 import {
   ProjectStore,
   acceptAlignment,
@@ -322,14 +323,9 @@ async function handleTranscript(args: string[]): Promise<void> {
 }
 
 async function handleAlign(args: string[]): Promise<void> {
-  if (!args.includes('--from-transcript')) {
-    throw new Error(
-      'M2 core supports: videooo align --from-transcript [--accept-low-coverage]',
-    )
-  }
-
   const store = new ProjectStore()
-  const project = await store.loadProject()
+  let project = await store.loadProject()
+
   if (project.stage !== 'recorded') {
     throw new Error(
       `Alignment requires stage "recorded"; current stage is "${project.stage}"`,
@@ -339,10 +335,58 @@ async function handleAlign(args: string[]): Promise<void> {
     throw new Error('Project has no approved script version')
   }
 
+  const narration = await store.loadNarration()
+  let transcript
+
+  if (args.includes('--from-transcript')) {
+    transcript = await store.loadTranscript()
+    if (project.transcriptId !== transcript.id) {
+      throw new Error(
+        'Project transcript metadata does not match transcript.json. Import the transcript through Videooo first.',
+      )
+    }
+  } else {
+    const provider = optionValue(args, '--provider')
+    if (provider !== 'whisper-cpp') {
+      throw new Error(
+        'Usage: videooo align --from-transcript OR videooo align --provider whisper-cpp [--model <path>] [--language <code>] [--binary <path>] [--ffmpeg <path>] [--accept-low-coverage]',
+      )
+    }
+    if (await store.hasTranscript()) {
+      throw new Error(
+        'A transcript already exists. Use --from-transcript to align it.',
+      )
+    }
+
+    const modelPath = optionValue(args, '--model')
+    const binary = optionValue(args, '--binary')
+    const ffmpegBinary = optionValue(args, '--ffmpeg')
+    const language = optionValue(args, '--language')
+    const transcriber = new WhisperCppTranscriber({
+      ...(modelPath === undefined ? {} : { modelPath }),
+      ...(binary === undefined ? {} : { binary }),
+      ...(ffmpegBinary === undefined ? {} : { ffmpegBinary }),
+      ...(language === undefined ? {} : { language }),
+    })
+
+    const candidate = await transcriber.transcribe({
+      audioPath: store.narrationSourcePath(narration),
+      projectId: project.id,
+      narrationId: narration.id,
+      ...(language === undefined ? {} : { language }),
+    })
+    transcript = parseTranscriptArtifact(candidate, project, narration)
+    await store.saveTranscript(transcript)
+    project = acceptTranscript(project, transcript)
+    await store.saveProject(project)
+    console.log(
+      `Transcribed narration locally with whisper.cpp as "${transcript.id}".`,
+    )
+  }
+
   const script = await store.loadScriptVersionById(
     project.approvedScriptVersionId,
   )
-  const transcript = await store.loadTranscript()
   const alignment = buildNarrationAlignment(script, transcript, {
     acceptedLowCoverage: args.includes('--accept-low-coverage'),
   })
@@ -393,6 +437,19 @@ async function readCliVersion(): Promise<string> {
   return value.version
 }
 
+function optionValue(
+  args: readonly string[],
+  name: string,
+): string | undefined {
+  const index = args.indexOf(name)
+  if (index < 0) return undefined
+  const value = args[index + 1]
+  if (value === undefined || value.startsWith('--')) {
+    throw new Error(`Missing value for ${name}`)
+  }
+  return value
+}
+
 function parseVersion(value: string): number {
   const version = Number(value)
   if (!Number.isSafeInteger(version) || version < 1) {
@@ -421,6 +478,7 @@ Usage:
   videooo transcript import <transcript.json>
   videooo transcript show
   videooo align --from-transcript [--accept-low-coverage]
+  videooo align --provider whisper-cpp [--model <path>] [--language <code>] [--binary <path>] [--ffmpeg <path>] [--accept-low-coverage]
   videooo alignment show`)
 }
 
