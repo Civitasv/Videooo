@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -64,6 +64,7 @@ describe('ProjectStore M5', () => {
     roots.push(root)
     const store = new ProjectStore(root)
     await store.initialize(project())
+    await mkdir(store.rendersDirectory, { recursive: true })
     await writeFile(store.draftRenderPath, Buffer.from('video'))
 
     await store.acceptRenderAsFinal()
