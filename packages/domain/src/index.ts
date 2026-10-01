@@ -126,6 +126,111 @@ export interface ScriptVersion {
   sections: ScriptSection[]
 }
 
+export interface NarrationAsset {
+  schemaVersion: 1
+  id: string
+  projectId: string
+  scriptVersionId: string
+  importedAt: string
+  sourceFileName: string
+  storedFileName: string
+  sha256: string
+  byteLength: number
+  mediaType?: string
+}
+
+export interface TranscriptSegment {
+  id: string
+  startMs: number
+  endMs: number
+  text: string
+}
+
+export interface TranscriptToken {
+  id: string
+  startMs: number
+  endMs: number
+  text: string
+  confidence?: number
+}
+
+export interface TranscriptArtifact {
+  schemaVersion: 1
+  id: string
+  projectId: string
+  narrationId: string
+  createdAt: string
+  provider: string
+  model?: string
+  language?: string
+  durationMs: number
+  text: string
+  segments: TranscriptSegment[]
+  tokens: TranscriptToken[]
+}
+
+export interface ScriptToken {
+  id: string
+  sectionId: string
+  index: number
+  text: string
+  normalized: string
+}
+
+export type AlignmentStatus =
+  | 'exact'
+  | 'normalized'
+  | 'substituted'
+  | 'missing'
+  | 'interpolated'
+
+export interface AlignedScriptToken extends ScriptToken {
+  startMs?: number
+  endMs?: number
+  transcriptTokenIds: string[]
+  status: AlignmentStatus
+}
+
+export interface ScriptDeviation {
+  id: string
+  kind: 'insertion' | 'deletion' | 'substitution'
+  sectionId?: string
+  scriptText?: string
+  spokenText?: string
+  startMs?: number
+  endMs?: number
+}
+
+export interface NarrationPause {
+  startMs: number
+  endMs: number
+  durationMs: number
+}
+
+export interface AlignedSection {
+  sectionId: string
+  startMs?: number
+  endMs?: number
+  coverage: number
+}
+
+export interface NarrationAlignment {
+  schemaVersion: 1
+  id: string
+  projectId: string
+  narrationId: string
+  scriptVersionId: string
+  transcriptId: string
+  createdAt: string
+  durationMs: number
+  coverage: number
+  acceptedLowCoverage: boolean
+  scriptTokens: AlignedScriptToken[]
+  deviations: ScriptDeviation[]
+  pauses: NarrationPause[]
+  sections: AlignedSection[]
+}
+
 export interface NarrationSegment {
   id: string
   startMs: number
@@ -191,6 +296,9 @@ export interface VideoProjectManifest {
   researchPackId?: string
   approvedScriptVersionId?: string
   approvedScriptAt?: string
+  narrationId?: string
+  transcriptId?: string
+  alignmentId?: string
 }
 
 export interface RendererAdapter {

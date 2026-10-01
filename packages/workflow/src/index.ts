@@ -491,3 +491,4 @@ function addUnknownReferences(
     }
   }
 }
+export * from './narration.js'

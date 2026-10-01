@@ -4,11 +4,16 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import {
   ProjectStore,
+  acceptAlignment,
+  acceptNarration,
   acceptScriptVersion,
+  acceptTranscript,
   approveScriptVersion,
+  buildNarrationAlignment,
   createProject,
   parseResearchPack,
   parseScriptVersion,
+  parseTranscriptArtifact,
   transitionProject,
 } from '@videooo/core'
 
@@ -39,6 +44,18 @@ async function main(): Promise<void> {
     case 'script':
       await handleScript(args)
       return
+    case 'narration':
+      await handleNarration(args)
+      return
+    case 'transcript':
+      await handleTranscript(args)
+      return
+    case 'align':
+      await handleAlign(args)
+      return
+    case 'alignment':
+      await handleAlignment(args)
+      return
     default:
       throw new Error(`Unknown command: ${command}`)
   }
@@ -60,6 +77,8 @@ async function handleStatus(): Promise<void> {
   const store = new ProjectStore()
   const project = await store.loadProject()
   const versions = await store.listScriptVersions()
+  const alignment =
+    (await store.hasAlignment()) ? await store.loadAlignment() : null
 
   console.log(
     JSON.stringify(
@@ -73,6 +92,13 @@ async function handleStatus(): Promise<void> {
         latestScriptVersion: versions.at(-1) ?? null,
         approvedScriptVersionId: project.approvedScriptVersionId ?? null,
         approvedScriptAt: project.approvedScriptAt ?? null,
+        hasNarration: await store.hasNarration(),
+        narrationId: project.narrationId ?? null,
+        hasTranscript: await store.hasTranscript(),
+        transcriptId: project.transcriptId ?? null,
+        hasAlignment: alignment !== null,
+        alignmentId: project.alignmentId ?? null,
+        alignmentCoverage: alignment?.coverage ?? null,
       },
       null,
       2,
@@ -223,6 +249,133 @@ async function handleScript(args: string[]): Promise<void> {
   }
 }
 
+async function handleNarration(args: string[]): Promise<void> {
+  const [action, argument] = args
+  const store = new ProjectStore()
+  const project = await store.loadProject()
+
+  switch (action) {
+    case 'add': {
+      if (argument === undefined) {
+        throw new Error('Usage: videooo narration add <audio-file>')
+      }
+      if (project.approvedScriptVersionId === undefined) {
+        throw new Error('Project has no approved script version')
+      }
+
+      await store.loadScriptVersionById(project.approvedScriptVersionId)
+      const narration = await store.importNarrationSource(argument, {
+        projectId: project.id,
+        scriptVersionId: project.approvedScriptVersionId,
+      })
+      await store.saveProject(acceptNarration(project, narration))
+      console.log(
+        `Imported narration "${narration.sourceFileName}" as "${narration.id}".`,
+      )
+      return
+    }
+
+    case 'show':
+      console.log(JSON.stringify(await store.loadNarration(), null, 2))
+      return
+
+    default:
+      throw new Error('Usage: videooo narration <add <audio-file>|show>')
+  }
+}
+
+async function handleTranscript(args: string[]): Promise<void> {
+  const [action, argument] = args
+  const store = new ProjectStore()
+  const project = await store.loadProject()
+
+  switch (action) {
+    case 'import': {
+      if (argument === undefined) {
+        throw new Error('Usage: videooo transcript import <transcript.json>')
+      }
+      if (project.stage !== 'recorded') {
+        throw new Error(
+          `Transcript import requires stage "recorded"; current stage is "${project.stage}"`,
+        )
+      }
+
+      const narration = await store.loadNarration()
+      const transcript = parseTranscriptArtifact(
+        await readJsonFile(argument),
+        project,
+        narration,
+      )
+      await store.saveTranscript(transcript)
+      await store.saveProject(acceptTranscript(project, transcript))
+      console.log(`Imported transcript "${transcript.id}".`)
+      return
+    }
+
+    case 'show':
+      console.log(JSON.stringify(await store.loadTranscript(), null, 2))
+      return
+
+    default:
+      throw new Error('Usage: videooo transcript <import <transcript.json>|show>')
+  }
+}
+
+async function handleAlign(args: string[]): Promise<void> {
+  if (!args.includes('--from-transcript')) {
+    throw new Error(
+      'M2 core supports: videooo align --from-transcript [--accept-low-coverage]',
+    )
+  }
+
+  const store = new ProjectStore()
+  const project = await store.loadProject()
+  if (project.stage !== 'recorded') {
+    throw new Error(
+      `Alignment requires stage "recorded"; current stage is "${project.stage}"`,
+    )
+  }
+  if (project.approvedScriptVersionId === undefined) {
+    throw new Error('Project has no approved script version')
+  }
+
+  const script = await store.loadScriptVersionById(
+    project.approvedScriptVersionId,
+  )
+  const transcript = await store.loadTranscript()
+  const alignment = buildNarrationAlignment(script, transcript, {
+    acceptedLowCoverage: args.includes('--accept-low-coverage'),
+  })
+
+  await store.saveAlignment(alignment, {
+    replace: await store.hasAlignment(),
+  })
+
+  try {
+    const aligned = acceptAlignment(project, alignment)
+    await store.saveProject(aligned)
+  } catch (error) {
+    console.error(
+      `Alignment candidate saved with coverage ${(alignment.coverage * 100).toFixed(1)}%.`,
+    )
+    throw error
+  }
+
+  console.log(
+    `Aligned narration at ${(alignment.coverage * 100).toFixed(1)}% coverage with ${alignment.deviations.length} deviation(s).`,
+  )
+}
+
+async function handleAlignment(args: string[]): Promise<void> {
+  const [action] = args
+  if (action !== 'show') {
+    throw new Error('Usage: videooo alignment show')
+  }
+
+  const store = new ProjectStore()
+  console.log(JSON.stringify(await store.loadAlignment(), null, 2))
+}
+
 async function readJsonFile(path: string): Promise<unknown> {
   return JSON.parse(
     await readFile(resolve(process.cwd(), path), 'utf8'),
@@ -262,7 +415,13 @@ Usage:
   videooo script import <script.json>
   videooo script list
   videooo script show [version]
-  videooo script approve <version>`)
+  videooo script approve <version>
+  videooo narration add <audio-file>
+  videooo narration show
+  videooo transcript import <transcript.json>
+  videooo transcript show
+  videooo align --from-transcript [--accept-low-coverage]
+  videooo alignment show`)
 }
 
 try {
