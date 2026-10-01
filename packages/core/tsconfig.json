@@ -8,6 +8,7 @@
   "references": [
     { "path": "../alignment" },
     { "path": "../domain" },
+    { "path": "../previs" },
     { "path": "../project-store" },
     { "path": "../qa" },
     { "path": "../storyboard" },
