@@ -8,6 +8,7 @@
   },
   "references": [
     { "path": "../../packages/core" },
+    { "path": "../../packages/renderer-remotion" },
     { "path": "../../packages/transcriber-whisper-cpp" }
   ],
   "include": ["src/**/*.ts"]
