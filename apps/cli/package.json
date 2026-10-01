@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@videooo/core": "workspace:*",
+    "@videooo/renderer-remotion": "workspace:*",
     "@videooo/transcriber-whisper-cpp": "workspace:*"
   }
 }
