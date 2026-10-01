@@ -6,6 +6,9 @@
     "tsBuildInfoFile": ".build/.tsbuildinfo",
     "types": ["node"]
   },
-  "references": [{ "path": "../../packages/core" }],
+  "references": [
+    { "path": "../../packages/core" },
+    { "path": "../../packages/transcriber-whisper-cpp" }
+  ],
   "include": ["src/**/*.ts"]
 }
