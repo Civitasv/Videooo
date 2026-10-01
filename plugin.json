@@ -1,0 +1,21 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "videooo",
+  "version": "0.1.0",
+  "description": "AI-native workflow for researched, human-narrated educational videos.",
+  "author": {
+    "name": "Civitasv",
+    "url": "https://github.com/Civitasv"
+  },
+  "homepage": "https://github.com/Civitasv/Videooo",
+  "repository": "https://github.com/Civitasv/Videooo",
+  "license": "MIT",
+  "keywords": [
+    "video",
+    "education",
+    "research",
+    "remotion",
+    "manim",
+    "codex"
+  ]
+}
