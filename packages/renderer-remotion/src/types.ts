@@ -12,4 +12,5 @@ export interface VideoooRenderProps extends Record<string, unknown> {
   video: VideoFormat
   durationMs: number
   narrationFile: string
+  manimAssets: Record<string, string>
 }
