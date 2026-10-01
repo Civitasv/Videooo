@@ -16,6 +16,7 @@ import type {
   NarrationAlignment,
   NarrationAsset,
   QaEvidencePack,
+  QaRepairOverlay,
   QaReport,
   QaReviewArtifact,
   ResearchPack,
@@ -103,6 +104,10 @@ export class ProjectStore {
     return resolve(this.directory, 'qa')
   }
 
+  get qaRepairsDirectory(): string {
+    return resolve(this.qaDirectory, 'repairs')
+  }
+
   get renderManifestPath(): string {
     return resolve(this.rendersDirectory, 'render.json')
   }
@@ -131,6 +136,13 @@ export class ProjectStore {
     return resolve(
       this.sceneRendersDirectory,
       `${sceneId.replace(/[^a-zA-Z0-9._-]+/g, '-')}.mp4`,
+    )
+  }
+
+  qaRepairPath(repairId: string): string {
+    return resolve(
+      this.qaRepairsDirectory,
+      `${validateQaRepairId(repairId)}.json`,
     )
   }
 
@@ -505,6 +517,40 @@ export class ProjectStore {
     await mkdir(this.rendersDirectory, { recursive: true })
     await copyFile(absoluteSource, this.finalRenderPath)
   }
+
+  async nextQaRepairId(): Promise<string> {
+    if (!(await pathExists(this.qaRepairsDirectory))) {
+      return 'repair-001'
+    }
+
+    let max = 0
+    for (const entry of await readdir(this.qaRepairsDirectory, {
+      withFileTypes: true,
+    })) {
+      if (!entry.isFile()) continue
+      const match = /^repair-(\d{3,})\.json$/.exec(entry.name)
+      if (match === null) continue
+      max = Math.max(max, Number(match[1]))
+    }
+
+    return `repair-${String(max + 1).padStart(3, '0')}`
+  }
+
+  async saveQaRepair(overlay: QaRepairOverlay): Promise<void> {
+    const path = this.qaRepairPath(overlay.id)
+    if (await pathExists(path)) {
+      throw new Error(`QA repair "${overlay.id}" already exists`)
+    }
+    await writeJsonAtomic(path, overlay)
+  }
+
+  async loadQaRepair(repairId: string): Promise<QaRepairOverlay> {
+    return readJson<QaRepairOverlay>(this.qaRepairPath(repairId))
+  }
+
+  async loadQaRepairs(repairIds: readonly string[]): Promise<QaRepairOverlay[]> {
+    return Promise.all(repairIds.map((id) => this.loadQaRepair(id)))
+  }
 }
 
 async function readJson<T>(path: string): Promise<T> {
@@ -573,6 +619,13 @@ function mediaTypeForExtension(extension: string): string | undefined {
 function validateQaRunId(value: string): string {
   if (!/^run-\d{3,}$/.test(value)) {
     throw new Error(`Invalid QA run id: ${value}`)
+  }
+  return value
+}
+
+function validateQaRepairId(value: string): string {
+  if (!/^repair-\d{3,}$/.test(value)) {
+    throw new Error(`Invalid QA repair id: ${value}`)
   }
   return value
 }
