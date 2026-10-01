@@ -873,6 +873,31 @@ async function handleQa(args: string[]): Promise<void> {
     return
   }
 
+  if (action === 'rerender') {
+    if (project.stage !== 'qa') {
+      throw new Error(
+        `QA rerender requires stage "qa"; current stage is "${project.stage}"`,
+      )
+    }
+    const report = await store.loadQaReport(runId)
+    const structuralBlockers = report.findings.filter(
+      (finding) =>
+        finding.severity === 'error' &&
+        finding.category === 'structural',
+    )
+    if (structuralBlockers.length === 0) {
+      throw new Error(
+        'QA rerender without a repair overlay requires a blocking structural finding',
+      )
+    }
+    project = transitionProject(project, 'rendering')
+    await store.saveProject(project)
+    console.log(
+      `Project returned to rendering for ${structuralBlockers.length} structural blocker(s).`,
+    )
+    return
+  }
+
   if (action === 'repair') {
     if (project.stage !== 'qa') {
       throw new Error(
@@ -934,7 +959,7 @@ async function handleQa(args: string[]): Promise<void> {
   }
 
   throw new Error(
-    'Usage: videooo qa <prepare|evidence|import <review.json>|report|repair import <repair.json>|accept> [--ffmpeg <path>] [--ffprobe <path>]',
+    'Usage: videooo qa <prepare|evidence|import <review.json>|report|rerender|repair import <repair.json>|accept> [--ffmpeg <path>] [--ffprobe <path>]',
   )
 }
 
@@ -1032,6 +1057,7 @@ Usage:
   videooo qa evidence
   videooo qa import <review.json>
   videooo qa report
+  videooo qa rerender
   videooo qa repair import <repair.json>
   videooo qa accept`)
 }
