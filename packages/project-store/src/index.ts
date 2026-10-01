@@ -16,9 +16,12 @@ import type {
   NarrationAlignment,
   NarrationAsset,
   ResearchPack,
+  SceneIR,
   ScriptVersion,
+  StoryboardArtifact,
   TranscriptArtifact,
   VideoProjectManifest,
+  VideoStyle,
 } from '@videooo/domain'
 
 export interface ImportNarrationInput {
@@ -64,6 +67,25 @@ export class ProjectStore {
 
   get alignmentPath(): string {
     return resolve(this.narrationDirectory, 'alignment.json')
+  }
+
+  get storyboardPath(): string {
+    return resolve(this.directory, 'storyboard.json')
+  }
+
+  get stylePath(): string {
+    return resolve(this.directory, 'style.json')
+  }
+
+  get scenesDirectory(): string {
+    return resolve(this.directory, 'scenes')
+  }
+
+  scenePath(index: number): string {
+    return resolve(
+      this.scenesDirectory,
+      `scene_${String(index + 1).padStart(3, '0')}.json`,
+    )
   }
 
   narrationSourcePath(asset: NarrationAsset): string {
@@ -250,6 +272,59 @@ export class ProjectStore {
 
   async loadAlignment(): Promise<NarrationAlignment> {
     return readJson<NarrationAlignment>(this.alignmentPath)
+  }
+
+  async hasStoryboard(): Promise<boolean> {
+    return pathExists(this.storyboardPath)
+  }
+
+  async saveStoryboard(storyboard: StoryboardArtifact): Promise<void> {
+    if (await this.hasStoryboard()) {
+      throw new Error('Storyboard already exists; M3 does not replace storyboard')
+    }
+    await writeJsonAtomic(this.storyboardPath, storyboard)
+  }
+
+  async loadStoryboard(): Promise<StoryboardArtifact> {
+    return readJson<StoryboardArtifact>(this.storyboardPath)
+  }
+
+  async hasStyle(): Promise<boolean> {
+    return pathExists(this.stylePath)
+  }
+
+  async saveStyle(style: VideoStyle): Promise<void> {
+    await writeJsonAtomic(this.stylePath, style)
+  }
+
+  async loadStyle(): Promise<VideoStyle> {
+    return readJson<VideoStyle>(this.stylePath)
+  }
+
+  async saveScenes(scenes: readonly SceneIR[]): Promise<void> {
+    await rm(this.scenesDirectory, { recursive: true, force: true })
+    await mkdir(this.scenesDirectory, { recursive: true })
+
+    for (const [index, scene] of scenes.entries()) {
+      await writeJsonAtomic(this.scenePath(index), scene)
+    }
+  }
+
+  async listScenes(): Promise<SceneIR[]> {
+    if (!(await pathExists(this.scenesDirectory))) return []
+    const names = (await readdir(this.scenesDirectory))
+      .filter((name) => /^scene_\d+\.json$/.test(name))
+      .sort()
+    return Promise.all(
+      names.map((name) => readJson<SceneIR>(resolve(this.scenesDirectory, name))),
+    )
+  }
+
+  async loadScene(id: string): Promise<SceneIR> {
+    for (const scene of await this.listScenes()) {
+      if (scene.id === id) return scene
+    }
+    throw new Error(`Scene "${id}" does not exist`)
   }
 }
 
