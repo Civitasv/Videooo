@@ -15,6 +15,9 @@ import { basename, dirname, extname, resolve } from 'node:path'
 import type {
   NarrationAlignment,
   NarrationAsset,
+  QaEvidencePack,
+  QaReport,
+  QaReviewArtifact,
   ResearchPack,
   SceneIR,
   SceneRenderAsset,
@@ -92,6 +95,14 @@ export class ProjectStore {
     return resolve(this.rendersDirectory, 'draft.mp4')
   }
 
+  get finalRenderPath(): string {
+    return resolve(this.rendersDirectory, 'final.mp4')
+  }
+
+  get qaDirectory(): string {
+    return resolve(this.directory, 'qa')
+  }
+
   get renderManifestPath(): string {
     return resolve(this.rendersDirectory, 'render.json')
   }
@@ -121,6 +132,26 @@ export class ProjectStore {
       this.sceneRendersDirectory,
       `${sceneId.replace(/[^a-zA-Z0-9._-]+/g, '-')}.mp4`,
     )
+  }
+
+  qaRunDirectory(runId: string): string {
+    return resolve(this.qaDirectory, validateQaRunId(runId))
+  }
+
+  qaFramesDirectory(runId: string): string {
+    return resolve(this.qaRunDirectory(runId), 'frames')
+  }
+
+  qaEvidencePath(runId: string): string {
+    return resolve(this.qaRunDirectory(runId), 'evidence.json')
+  }
+
+  qaReviewPath(runId: string): string {
+    return resolve(this.qaRunDirectory(runId), 'review.json')
+  }
+
+  qaReportPath(runId: string): string {
+    return resolve(this.qaRunDirectory(runId), 'report.json')
   }
 
   scenePath(index: number): string {
@@ -405,6 +436,72 @@ export class ProjectStore {
     const index = await this.loadSceneRenderIndex()
     return index.assets.find((item) => item.sceneId === sceneId) ?? null
   }
+
+  async nextQaRunId(): Promise<string> {
+    if (!(await pathExists(this.qaDirectory))) {
+      return 'run-001'
+    }
+
+    let max = 0
+    for (const entry of await readdir(this.qaDirectory, {
+      withFileTypes: true,
+    })) {
+      if (!entry.isDirectory()) continue
+      const match = /^run-(\d{3,})$/.exec(entry.name)
+      if (match === null) continue
+      max = Math.max(max, Number(match[1]))
+    }
+
+    return `run-${String(max + 1).padStart(3, '0')}`
+  }
+
+  async saveQaEvidence(evidence: QaEvidencePack): Promise<void> {
+    const path = this.qaEvidencePath(evidence.id)
+    if (await pathExists(path)) {
+      throw new Error(`QA evidence "${evidence.id}" already exists`)
+    }
+    await writeJsonAtomic(path, evidence)
+  }
+
+  async loadQaEvidence(runId: string): Promise<QaEvidencePack> {
+    return readJson<QaEvidencePack>(this.qaEvidencePath(runId))
+  }
+
+  async saveQaReview(
+    runId: string,
+    review: QaReviewArtifact,
+  ): Promise<void> {
+    const path = this.qaReviewPath(runId)
+    if (await pathExists(path)) {
+      throw new Error(`QA review for "${runId}" already exists`)
+    }
+    await writeJsonAtomic(path, review)
+  }
+
+  async loadQaReview(runId: string): Promise<QaReviewArtifact> {
+    return readJson<QaReviewArtifact>(this.qaReviewPath(runId))
+  }
+
+  async saveQaReport(runId: string, report: QaReport): Promise<void> {
+    const path = this.qaReportPath(runId)
+    if (await pathExists(path)) {
+      throw new Error(`QA report for "${runId}" already exists`)
+    }
+    await writeJsonAtomic(path, report)
+  }
+
+  async loadQaReport(runId: string): Promise<QaReport> {
+    return readJson<QaReport>(this.qaReportPath(runId))
+  }
+
+  async acceptDraftAsFinal(): Promise<void> {
+    const info = await stat(this.draftRenderPath)
+    if (!info.isFile() || info.size <= 0) {
+      throw new Error('Draft render is missing or empty')
+    }
+    await mkdir(this.rendersDirectory, { recursive: true })
+    await copyFile(this.draftRenderPath, this.finalRenderPath)
+  }
 }
 
 async function readJson<T>(path: string): Promise<T> {
@@ -468,4 +565,11 @@ function mediaTypeForExtension(extension: string): string | undefined {
     default:
       return undefined
   }
+}
+
+function validateQaRunId(value: string): string {
+  if (!/^run-\d{3,}$/.test(value)) {
+    throw new Error(`Invalid QA run id: ${value}`)
+  }
+  return value
 }
