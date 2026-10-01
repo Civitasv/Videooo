@@ -24,27 +24,85 @@ export type VisualKind =
   | 'media'
   | 'summary'
 
+export interface ProjectBrief {
+  audience?: string
+  targetDurationSeconds?: number
+  angle?: string
+  questions?: string[]
+  sourceConstraints?: string[]
+}
+
+export type SourceType = 'primary' | 'secondary' | 'community' | 'other'
+
 export interface SourceRecord {
   id: string
   title: string
   url: string
+  publisher?: string
+  publishedAt?: string
   accessedAt: string
+  sourceType: SourceType
 }
+
+export type ClaimKind = 'fact' | 'interpretation' | 'contested'
 
 export interface ResearchClaim {
   id: string
   text: string
   sourceIds: string[]
   confidence: 'high' | 'medium' | 'low'
+  kind: ClaimKind
+  notes?: string
+}
+
+export interface ResearchDefinition {
+  id: string
+  term: string
+  definition: string
+  sourceIds: string[]
+}
+
+export interface ResearchExample {
+  id: string
+  description: string
+  relatedClaimIds: string[]
+}
+
+export interface ResearchMisconception {
+  id: string
+  misconception: string
+  correction: string
+  relatedClaimIds: string[]
+}
+
+export type VisualOpportunityKind =
+  | 'diagram'
+  | 'equation'
+  | 'chart'
+  | 'concept-animation'
+  | 'code'
+  | 'comparison'
+
+export interface VisualOpportunity {
+  id: string
+  description: string
+  relatedClaimIds: string[]
+  suggestedKind?: VisualOpportunityKind
 }
 
 export interface ResearchPack {
+  schemaVersion: 1
+  id: string
+  projectId: string
   topic: string
+  createdAt: string
   questions: string[]
-  claims: ResearchClaim[]
   sources: SourceRecord[]
-  examples: string[]
-  misconceptions: string[]
+  claims: ResearchClaim[]
+  definitions: ResearchDefinition[]
+  examples: ResearchExample[]
+  misconceptions: ResearchMisconception[]
+  visualOpportunities: VisualOpportunity[]
   unresolved: string[]
 }
 
@@ -125,7 +183,10 @@ export interface VideoProjectManifest {
   stage: WorkflowStage
   createdAt: string
   updatedAt: string
+  brief?: ProjectBrief
+  researchPackId?: string
   approvedScriptVersionId?: string
+  approvedScriptAt?: string
 }
 
 export interface RendererAdapter {
