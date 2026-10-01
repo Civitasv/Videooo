@@ -1,5 +1,6 @@
 export * from '@videooo/alignment'
 export * from '@videooo/domain'
+export * from '@videooo/previs'
 export * from '@videooo/project-store'
 export * from '@videooo/qa'
 export * from '@videooo/storyboard'

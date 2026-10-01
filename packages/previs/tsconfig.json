@@ -6,13 +6,8 @@
     "tsBuildInfoFile": ".build/.tsbuildinfo"
   },
   "references": [
-    { "path": "../alignment" },
     { "path": "../domain" },
-    { "path": "../previs" },
-    { "path": "../project-store" },
-    { "path": "../qa" },
-    { "path": "../storyboard" },
-    { "path": "../workflow" }
+    { "path": "../storyboard" }
   ],
   "include": ["src/**/*.ts"]
 }

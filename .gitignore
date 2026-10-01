@@ -12,3 +12,5 @@ coverage/
 .videooo/tmp/
 .videooo/render-workspace/
 .videooo/manim/
+.videooo/previs/render-workspace/
+.videooo/previs/manim/

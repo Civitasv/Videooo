@@ -7,7 +7,7 @@ description: Orchestrate a Videooo educational-video project in the current work
 
 Use this skill when the user asks to create, start, continue, or inspect an educational-video project with Videooo.
 
-Videooo is script-first, human-narrated, and audio-synchronized. The current implementation covers research, collaborative script approval, human narration alignment, mixed Remotion/Manim rendering, visual QA, scene-scoped repair, and final acceptance.
+Videooo is script-first and human-narrated for final production, but it can also create silent Previs before narration exists. The current implementation covers research, collaborative script approval, provisional preview timing, human narration alignment, mixed Remotion/Manim rendering, visual QA, scene-scoped repair, and final acceptance.
 
 ## Runtime boundary
 
@@ -75,12 +75,30 @@ videooo script approve <version>
 
 ### approved
 
-The script is locked for narration.
+The script is locked.
 
-- Tell the user which script version is approved and ready to record.
-- The user records it with their preferred microphone/recording app.
+Choose the path from the user's intent:
+
+#### User is ready to record
+
+- Tell the user which script version is approved.
 - When the user provides or identifies the audio file, use the `narration` skill.
-- Import the audio through `videooo narration add <file>`; never copy it manually into project state.
+- Import it through `videooo narration add <file>`.
+
+#### User has no recording yet or wants to see the video first
+
+Use the `previs` skill.
+
+Create estimated timing and a silent preview while keeping the project in `approved`:
+
+```bash
+videooo previs create
+# create/import semantic preview storyboard
+videooo previs storyboard compile
+videooo previs render
+```
+
+Do not pretend the estimated timeline is real narration timing.
 
 ### recorded
 
@@ -100,7 +118,18 @@ If alignment coverage is below the quality gate, discuss the deviations with the
 
 Run `videooo status` and, when useful, `videooo alignment show`.
 
-Report duration, coverage, significant deviations, and section timing. Then use the `storyboard` skill to create, import, and compile the M3 storyboard.
+Report duration, coverage, significant deviations, and section timing.
+
+If a Previs storyboard exists, reuse it instead of redesigning:
+
+```bash
+videooo previs promote
+videooo storyboard compile
+```
+
+Then continue to render.
+
+If no Previs storyboard exists, use the normal `storyboard` skill to create/import/compile the production storyboard.
 
 ### storyboarded
 

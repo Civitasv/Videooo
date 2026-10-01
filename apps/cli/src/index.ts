@@ -17,15 +17,19 @@ import {
   assertQaReportPasses,
   buildNarrationAlignment,
   buildQaReport,
+  compilePrevisStoryboard,
   compileStoryboard,
   createProject,
+  estimateScriptTiming,
   parseQaRepairOverlay,
+  parsePrevisStoryboardArtifact,
   parseQaReviewArtifact,
   parseResearchPack,
   parseScriptVersion,
   parseStoryboardArtifact,
   parseTranscriptArtifact,
   prepareQaEvidence,
+  promotePrevisStoryboard,
   transitionProject,
 } from '@videooo/core'
 
@@ -86,6 +90,9 @@ async function main(): Promise<void> {
     case 'qa':
       await handleQa(args)
       return
+    case 'previs':
+      await handlePrevis(args)
+      return
     default:
       throw new Error(`Unknown command: ${command}`)
   }
@@ -138,6 +145,12 @@ async function handleStatus(): Promise<void> {
         qaRunId: project.qaRunId ?? null,
         qaReportId: project.qaReportId ?? null,
         qaRepairIds: project.qaRepairIds ?? [],
+        hasPrevisTiming: await store.hasPrevisTiming(),
+        previsTimingId: project.previsTimingId ?? null,
+        hasPrevisStoryboard: await store.hasPrevisStoryboard(),
+        previsStoryboardId: project.previsStoryboardId ?? null,
+        hasPrevisRender: await store.hasPrevisRenderManifest(),
+        previsRenderId: project.previsRenderId ?? null,
       },
       null,
       2,
@@ -765,6 +778,292 @@ async function handleRender(args: string[]): Promise<void> {
   )
 }
 
+async function handlePrevis(args: string[]): Promise<void> {
+  const [action, subaction, argument] = args
+  const store = new ProjectStore()
+  let project = await store.loadProject()
+
+  if (action === 'create') {
+    if (project.stage !== 'approved') {
+      throw new Error(
+        `Previs create requires stage "approved"; current stage is "${project.stage}"`,
+      )
+    }
+    const approvedScriptVersionId = project.approvedScriptVersionId
+    if (approvedScriptVersionId === undefined) {
+      throw new Error('Project has no approved script version')
+    }
+
+    const script = await store.loadScriptVersionById(approvedScriptVersionId)
+    const targetSeconds = optionValue(args, '--target-seconds')
+    const targetDurationMs =
+      targetSeconds === undefined
+        ? undefined
+        : Math.round(parsePositiveNumber(targetSeconds, '--target-seconds') * 1000)
+    const timing = estimateScriptTiming(project, script, {
+      ...(targetDurationMs === undefined ? {} : { targetDurationMs }),
+    })
+    await store.savePrevisTiming(timing)
+
+    project = {
+      ...project,
+      previsTimingId: timing.id,
+    }
+    delete project.previsStoryboardId
+    delete project.previsRenderId
+    await store.saveProject(project)
+
+    console.log(
+      `Created estimated previs timing "${timing.id}" for ${(timing.durationMs / 1000).toFixed(1)}s. Project remains approved.`,
+    )
+    return
+  }
+
+  if (action === 'timing') {
+    console.log(JSON.stringify(await store.loadPrevisTiming(), null, 2))
+    return
+  }
+
+  if (action === 'storyboard') {
+    if (subaction === 'show') {
+      console.log(JSON.stringify(await store.loadPrevisStoryboard(), null, 2))
+      return
+    }
+
+    if (project.stage !== 'approved') {
+      throw new Error(
+        `Previs storyboard requires stage "approved"; current stage is "${project.stage}"`,
+      )
+    }
+
+    const timing = await store.loadPrevisTiming()
+    if (subaction === 'import') {
+      if (argument === undefined) {
+        throw new Error(
+          'Usage: videooo previs storyboard import <storyboard.json>',
+        )
+      }
+      const storyboard = parsePrevisStoryboardArtifact(
+        await readJsonFile(argument),
+        project,
+        timing,
+      )
+      await store.savePrevisStoryboard(storyboard)
+      project = {
+        ...project,
+        previsStoryboardId: storyboard.id,
+      }
+      delete project.previsRenderId
+      await store.saveProject(project)
+      console.log(
+        `Imported previs storyboard "${storyboard.id}" with ${storyboard.scenes.length} scene(s).`,
+      )
+      return
+    }
+
+    if (subaction === 'compile') {
+      const storyboard = parsePrevisStoryboardArtifact(
+        await store.loadPrevisStoryboard(),
+        project,
+        timing,
+      )
+      const scenes = compilePrevisStoryboard(storyboard)
+      await store.savePrevisScenes(scenes)
+      project = {
+        ...project,
+        previsStoryboardId: storyboard.id,
+      }
+      await store.saveProject(project)
+      console.log(
+        `Compiled ${scenes.length} previs scene(s). Project remains approved.`,
+      )
+      return
+    }
+
+    throw new Error(
+      'Usage: videooo previs storyboard <import <storyboard.json>|show|compile>',
+    )
+  }
+
+  if (action === 'scenes') {
+    if (subaction !== 'list') {
+      throw new Error('Usage: videooo previs scenes list')
+    }
+    console.log(
+      JSON.stringify(
+        (await store.listPrevisScenes()).map((scene) => ({
+          id: scene.id,
+          startMs: scene.startMs,
+          durationMs: scene.durationMs,
+          visualKind: scene.visualKind,
+          renderer: scene.renderer,
+          teachingGoal: scene.teachingGoal,
+        })),
+        null,
+        2,
+      ),
+    )
+    return
+  }
+
+  if (action === 'route') {
+    if (subaction !== 'show') {
+      throw new Error('Usage: videooo previs route show')
+    }
+    console.log(
+      JSON.stringify(
+        (await store.listPrevisScenes()).map((scene) => ({
+          id: scene.id,
+          visualKind: scene.visualKind,
+          renderer: scene.renderer,
+        })),
+        null,
+        2,
+      ),
+    )
+    return
+  }
+
+  if (action === 'render') {
+    if (project.stage !== 'approved') {
+      throw new Error(
+        `Previs render requires stage "approved"; current stage is "${project.stage}"`,
+      )
+    }
+
+    const timing = await store.loadPrevisTiming()
+    const storyboard = parsePrevisStoryboardArtifact(
+      await store.loadPrevisStoryboard(),
+      project,
+      timing,
+    )
+    const scenes = await store.listPrevisScenes()
+    if (scenes.length !== storyboard.scenes.length) {
+      throw new Error(
+        'Previs Scene IR is missing or stale; run videooo previs storyboard compile',
+      )
+    }
+
+    const style =
+      (await store.hasStyle()) ? await store.loadStyle() : DEFAULT_VIDEO_STYLE
+    const manimSceneAssets: Record<string, string> = {}
+    const manimScenes = scenes.filter((scene) => scene.renderer === 'manim')
+    if (manimScenes.length > 0) {
+      const manimBinary = optionValue(args, '--manim-bin')
+      const ffprobeBinary = optionValue(args, '--ffprobe')
+      const worker = new ManimWorker({
+        ...(manimBinary === undefined ? {} : { binary: manimBinary }),
+        ...(ffprobeBinary === undefined ? {} : { ffprobeBinary }),
+      })
+
+      for (const scene of manimScenes) {
+        const asset = await renderOnePrevisManimScene(
+          worker,
+          store,
+          scene,
+          storyboard.video,
+          style,
+        )
+        manimSceneAssets[scene.id] = resolve(
+          store.previsSceneRendersDirectory,
+          asset.fileName,
+        )
+      }
+    }
+
+    const requestedOutput = optionValue(args, '--output')
+    const outputLocation =
+      requestedOutput === undefined
+        ? store.previsPreviewPath
+        : resolve(process.cwd(), requestedOutput)
+
+    const result = await renderRemotionVideo({
+      scenes,
+      style,
+      video: storyboard.video,
+      durationMs: timing.durationMs,
+      workspaceDirectory: store.previsRenderWorkspaceDirectory,
+      outputLocation,
+      manimSceneAssets,
+    })
+
+    const manifest = {
+      schemaVersion: 1 as const,
+      id: `previs-render-${storyboard.id}`,
+      projectId: project.id,
+      storyboardId: storyboard.id,
+      timingId: timing.id,
+      createdAt: new Date().toISOString(),
+      renderer: 'remotion' as const,
+      outputPath:
+        requestedOutput === undefined
+          ? 'previs/renders/preview.mp4'
+          : requestedOutput,
+      width: storyboard.video.width,
+      height: storyboard.video.height,
+      fps: storyboard.video.fps,
+      durationMs: timing.durationMs,
+      codec: 'h264' as const,
+    }
+    await store.savePrevisRenderManifest(manifest)
+    project = { ...project, previsRenderId: manifest.id }
+    await store.saveProject(project)
+
+    console.log(
+      `Rendered silent previs ${result.frameCount} frame(s) to ${result.outputLocation}. Project remains approved.`,
+    )
+    return
+  }
+
+  if (action === 'promote') {
+    if (project.stage !== 'aligned') {
+      throw new Error(
+        `Previs promote requires stage "aligned"; current stage is "${project.stage}"`,
+      )
+    }
+    if (await store.hasStoryboard()) {
+      throw new Error(
+        'Production storyboard already exists; refusing to overwrite it with previs.',
+      )
+    }
+
+    const timing = await store.loadPrevisTiming()
+    const previs = await store.loadPrevisStoryboard()
+    const alignment = await store.loadAlignment()
+    const promoted = promotePrevisStoryboard(previs, timing, alignment)
+    parseStoryboardArtifact(promoted, project, alignment)
+    await store.saveStoryboard(promoted)
+
+    console.log(
+      `Promoted previs storyboard "${promoted.id}" onto real narration timing. Run videooo storyboard compile next.`,
+    )
+    return
+  }
+
+  throw new Error(
+    'Usage: videooo previs <create|timing|storyboard import/show/compile|scenes list|route show|render|promote>',
+  )
+}
+
+async function renderOnePrevisManimScene(
+  worker: ManimWorker,
+  store: ProjectStore,
+  scene: Awaited<ReturnType<ProjectStore['listPrevisScenes']>>[number],
+  video: Awaited<ReturnType<ProjectStore['loadPrevisStoryboard']>>['video'],
+  style: typeof DEFAULT_VIDEO_STYLE,
+) {
+  const asset = await worker.render({
+    scene,
+    style,
+    video,
+    generatedDirectory: store.previsManimGeneratedDirectory,
+    mediaDirectory: store.previsManimMediaDirectory,
+    outputDirectory: store.previsSceneRendersDirectory,
+  })
+  await store.savePrevisSceneRenderAsset(asset)
+  return asset
+}
+
 async function handleQa(args: string[]): Promise<void> {
   const [action, argument] = args
   const store = new ProjectStore()
@@ -1013,6 +1312,14 @@ function optionValue(
   return value
 }
 
+function parsePositiveNumber(value: string, name: string): number {
+  const number = Number(value)
+  if (!Number.isFinite(number) || number <= 0) {
+    throw new Error(`${name} must be a positive number`)
+  }
+  return number
+}
+
 function parseVersion(value: string): number {
   const version = Number(value)
   if (!Number.isSafeInteger(version) || version < 1) {
@@ -1036,6 +1343,15 @@ Usage:
   videooo script list
   videooo script show [version]
   videooo script approve <version>
+  videooo previs create [--target-seconds <seconds>]
+  videooo previs timing
+  videooo previs storyboard import <storyboard.json>
+  videooo previs storyboard show
+  videooo previs storyboard compile
+  videooo previs scenes list
+  videooo previs route show
+  videooo previs render [--output <file>] [--manim-bin <path>] [--ffprobe <path>]
+  videooo previs promote
   videooo narration add <audio-file>
   videooo narration show
   videooo transcript import <transcript.json>

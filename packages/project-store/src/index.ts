@@ -13,8 +13,11 @@ import {
 } from 'node:fs/promises'
 import { basename, dirname, extname, resolve } from 'node:path'
 import type {
+  EstimatedTiming,
   NarrationAlignment,
   NarrationAsset,
+  PrevisRenderManifest,
+  PrevisStoryboardArtifact,
   QaEvidencePack,
   QaRepairOverlay,
   QaReport,
@@ -92,6 +95,54 @@ export class ProjectStore {
     return resolve(this.directory, 'renders')
   }
 
+  get previsDirectory(): string {
+    return resolve(this.directory, 'previs')
+  }
+
+  get previsTimingPath(): string {
+    return resolve(this.previsDirectory, 'timing.json')
+  }
+
+  get previsStoryboardPath(): string {
+    return resolve(this.previsDirectory, 'storyboard.json')
+  }
+
+  get previsScenesDirectory(): string {
+    return resolve(this.previsDirectory, 'scenes')
+  }
+
+  get previsRendersDirectory(): string {
+    return resolve(this.previsDirectory, 'renders')
+  }
+
+  get previsPreviewPath(): string {
+    return resolve(this.previsRendersDirectory, 'preview.mp4')
+  }
+
+  get previsRenderManifestPath(): string {
+    return resolve(this.previsRendersDirectory, 'render.json')
+  }
+
+  get previsManimGeneratedDirectory(): string {
+    return resolve(this.previsDirectory, 'manim', 'generated')
+  }
+
+  get previsManimMediaDirectory(): string {
+    return resolve(this.previsDirectory, 'manim', 'media')
+  }
+
+  get previsSceneRendersDirectory(): string {
+    return resolve(this.previsRendersDirectory, 'scenes')
+  }
+
+  get previsSceneRenderIndexPath(): string {
+    return resolve(this.previsSceneRendersDirectory, 'index.json')
+  }
+
+  get previsRenderWorkspaceDirectory(): string {
+    return resolve(this.previsDirectory, 'render-workspace')
+  }
+
   get draftRenderPath(): string {
     return resolve(this.rendersDirectory, 'draft.mp4')
   }
@@ -164,6 +215,13 @@ export class ProjectStore {
 
   qaReportPath(runId: string): string {
     return resolve(this.qaRunDirectory(runId), 'report.json')
+  }
+
+  previsScenePath(index: number): string {
+    return resolve(
+      this.previsScenesDirectory,
+      `scene_${String(index + 1).padStart(3, '0')}.json`,
+    )
   }
 
   scenePath(index: number): string {
@@ -357,6 +415,85 @@ export class ProjectStore {
 
   async loadAlignment(): Promise<NarrationAlignment> {
     return readJson<NarrationAlignment>(this.alignmentPath)
+  }
+
+  async savePrevisTiming(timing: EstimatedTiming): Promise<void> {
+    await writeJsonAtomic(this.previsTimingPath, timing)
+  }
+
+  async loadPrevisTiming(): Promise<EstimatedTiming> {
+    return readJson<EstimatedTiming>(this.previsTimingPath)
+  }
+
+  async hasPrevisTiming(): Promise<boolean> {
+    return pathExists(this.previsTimingPath)
+  }
+
+  async savePrevisStoryboard(
+    storyboard: PrevisStoryboardArtifact,
+  ): Promise<void> {
+    await writeJsonAtomic(this.previsStoryboardPath, storyboard)
+  }
+
+  async loadPrevisStoryboard(): Promise<PrevisStoryboardArtifact> {
+    return readJson<PrevisStoryboardArtifact>(this.previsStoryboardPath)
+  }
+
+  async hasPrevisStoryboard(): Promise<boolean> {
+    return pathExists(this.previsStoryboardPath)
+  }
+
+  async savePrevisScenes(scenes: readonly SceneIR[]): Promise<void> {
+    await rm(this.previsScenesDirectory, { recursive: true, force: true })
+    await mkdir(this.previsScenesDirectory, { recursive: true })
+
+    for (const [index, scene] of scenes.entries()) {
+      await writeJsonAtomic(this.previsScenePath(index), scene)
+    }
+  }
+
+  async listPrevisScenes(): Promise<SceneIR[]> {
+    if (!(await pathExists(this.previsScenesDirectory))) return []
+    const names = (await readdir(this.previsScenesDirectory))
+      .filter((name) => /^scene_\d+\.json$/.test(name))
+      .sort()
+    return Promise.all(
+      names.map((name) =>
+        readJson<SceneIR>(resolve(this.previsScenesDirectory, name)),
+      ),
+    )
+  }
+
+  async savePrevisRenderManifest(
+    manifest: PrevisRenderManifest,
+  ): Promise<void> {
+    await writeJsonAtomic(this.previsRenderManifestPath, manifest)
+  }
+
+  async loadPrevisRenderManifest(): Promise<PrevisRenderManifest> {
+    return readJson<PrevisRenderManifest>(this.previsRenderManifestPath)
+  }
+
+  async hasPrevisRenderManifest(): Promise<boolean> {
+    return pathExists(this.previsRenderManifestPath)
+  }
+
+  async loadPrevisSceneRenderIndex(): Promise<SceneRenderIndex> {
+    if (!(await pathExists(this.previsSceneRenderIndexPath))) {
+      return { schemaVersion: 1, assets: [] }
+    }
+    return readJson<SceneRenderIndex>(this.previsSceneRenderIndexPath)
+  }
+
+  async savePrevisSceneRenderAsset(asset: SceneRenderAsset): Promise<void> {
+    const index = await this.loadPrevisSceneRenderIndex()
+    const assets = index.assets.filter((item) => item.sceneId !== asset.sceneId)
+    assets.push(asset)
+    assets.sort((left, right) => left.sceneId.localeCompare(right.sceneId))
+    await writeJsonAtomic(this.previsSceneRenderIndexPath, {
+      schemaVersion: 1,
+      assets,
+    })
   }
 
   async hasStoryboard(): Promise<boolean> {

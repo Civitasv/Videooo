@@ -24,7 +24,7 @@ export interface RenderRemotionVideoInput {
   style: VideoStyle
   video: VideoFormat
   durationMs: number
-  narrationSourcePath: string
+  narrationSourcePath?: string
   workspaceDirectory: string
   outputLocation: string
   manimSceneAssets?: Record<string, string>
@@ -34,7 +34,7 @@ export interface RenderRemotionVideoInput {
 export interface RenderRemotionVideoResult {
   outputLocation: string
   frameCount: number
-  narrationFile: string
+  narrationFile: string | null
 }
 
 export async function renderRemotionVideo(
@@ -49,12 +49,15 @@ export async function renderRemotionVideo(
   await rm(workspace, { recursive: true, force: true })
   await mkdir(publicDirectory, { recursive: true })
 
-  const extension = safeAudioExtension(input.narrationSourcePath)
-  const narrationFile = `narration${extension}`
-  await copyFile(
-    resolve(input.narrationSourcePath),
-    resolve(publicDirectory, narrationFile),
-  )
+  let narrationFile: string | undefined
+  if (input.narrationSourcePath !== undefined) {
+    const extension = safeAudioExtension(input.narrationSourcePath)
+    narrationFile = `narration${extension}`
+    await copyFile(
+      resolve(input.narrationSourcePath),
+      resolve(publicDirectory, narrationFile),
+    )
+  }
 
   const manimAssets: Record<string, string> = {}
   const manimPublicDirectory = resolve(publicDirectory, 'manim')
@@ -83,7 +86,7 @@ export async function renderRemotionVideo(
     style: input.style,
     video: input.video,
     durationMs: input.durationMs,
-    narrationFile,
+    ...(narrationFile === undefined ? {} : { narrationFile }),
     manimAssets,
   }
 
@@ -123,7 +126,7 @@ export async function renderRemotionVideo(
     return {
       outputLocation,
       frameCount: composition.durationInFrames,
-      narrationFile,
+      narrationFile: narrationFile ?? null,
     }
   } finally {
     await rm(serveUrl, { recursive: true, force: true }).catch(() => {})

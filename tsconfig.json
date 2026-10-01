@@ -5,6 +5,7 @@
     { "path": "./packages/alignment" },
     { "path": "./packages/visual-router" },
     { "path": "./packages/storyboard" },
+    { "path": "./packages/previs" },
     { "path": "./packages/manim-worker" },
     { "path": "./packages/qa" },
     { "path": "./packages/transcription" },
