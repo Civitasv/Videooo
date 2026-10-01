@@ -66,7 +66,7 @@ describe('ProjectStore M5', () => {
     await store.initialize(project())
     await writeFile(store.draftRenderPath, Buffer.from('video'))
 
-    await store.acceptDraftAsFinal()
+    await store.acceptRenderAsFinal()
     expect(store.finalRenderPath.endsWith('final.mp4')).toBe(true)
   })
 })
