@@ -17,6 +17,8 @@ import type {
   NarrationAsset,
   ResearchPack,
   SceneIR,
+  SceneRenderAsset,
+  SceneRenderIndex,
   ScriptVersion,
   StoryboardArtifact,
   TranscriptArtifact,
@@ -96,6 +98,29 @@ export class ProjectStore {
 
   get renderWorkspaceDirectory(): string {
     return resolve(this.directory, 'render-workspace')
+  }
+
+  get manimGeneratedDirectory(): string {
+    return resolve(this.directory, 'manim', 'generated')
+  }
+
+  get manimMediaDirectory(): string {
+    return resolve(this.directory, 'manim', 'media')
+  }
+
+  get sceneRendersDirectory(): string {
+    return resolve(this.rendersDirectory, 'scenes')
+  }
+
+  get sceneRenderIndexPath(): string {
+    return resolve(this.sceneRendersDirectory, 'index.json')
+  }
+
+  sceneRenderPath(sceneId: string): string {
+    return resolve(
+      this.sceneRendersDirectory,
+      `${sceneId.replace(/[^a-zA-Z0-9._-]+/g, '-')}.mp4`,
+    )
   }
 
   scenePath(index: number): string {
@@ -354,6 +379,31 @@ export class ProjectStore {
 
   async hasRenderManifest(): Promise<boolean> {
     return pathExists(this.renderManifestPath)
+  }
+
+  async loadSceneRenderIndex(): Promise<SceneRenderIndex> {
+    if (!(await pathExists(this.sceneRenderIndexPath))) {
+      return { schemaVersion: 1, assets: [] }
+    }
+    return readJson<SceneRenderIndex>(this.sceneRenderIndexPath)
+  }
+
+  async saveSceneRenderAsset(asset: SceneRenderAsset): Promise<void> {
+    const index = await this.loadSceneRenderIndex()
+    const assets = index.assets.filter((item) => item.sceneId !== asset.sceneId)
+    assets.push(asset)
+    assets.sort((left, right) => left.sceneId.localeCompare(right.sceneId))
+    await writeJsonAtomic(this.sceneRenderIndexPath, {
+      schemaVersion: 1,
+      assets,
+    })
+  }
+
+  async loadSceneRenderAsset(
+    sceneId: string,
+  ): Promise<SceneRenderAsset | null> {
+    const index = await this.loadSceneRenderIndex()
+    return index.assets.find((item) => item.sceneId === sceneId) ?? null
   }
 }
 
