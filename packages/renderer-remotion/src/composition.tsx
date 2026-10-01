@@ -51,7 +51,9 @@ export function VideoooComposition(props: VideoooRenderProps) {
         )
       })}
 
-      {props.narrationFile === undefined ? null : (\n        <Audio src={staticFile(props.narrationFile)} />\n      )}
+      {props.narrationFile === undefined ? null : (
+        <Audio src={staticFile(props.narrationFile)} />
+      )}
     </AbsoluteFill>
   )
 }
