@@ -12,15 +12,21 @@ Topic
   -> Draft Script
   -> Human + AI Review Loop
   -> Approved Script
-  -> Human Narration
-  -> Transcript / Alignment
-  -> Storyboard + Scene IR
-  -> Manim / Remotion
-  -> Visual QA
-  -> Final Video
+       |\
+       | \__ no recording yet
+       |       -> Estimated timing
+       |       -> Silent Previs preview.mp4
+       |
+       -> Human Narration
+       -> Transcript / Alignment
+       -> Reuse + retime Previs visual plan (when available)
+       -> Storyboard + Scene IR
+       -> Manim / Remotion
+       -> Visual QA
+       -> Final Video
 ```
 
-The approval boundary is deliberate: Videooo does not render against a moving script. Once the script is approved and narration is recorded, the audio timeline becomes the source of truth for visual timing.
+The approval boundary is deliberate: Videooo never renders against a moving script. Previs can use an explicitly estimated timeline before narration exists, but real human narration remains the timing source of truth for final production.
 
 ## Use Videooo from Codex
 
@@ -143,31 +149,34 @@ The installed plugin, CLI, skills, and future renderers are shared. They are not
 
 ## Current milestone
 
-M5 closes the V1 production loop:
+M5.5 adds **Previs / Late Narration** to the completed V1 production loop.
+
+You can now approve a script and see a real mixed Remotion/Manim preview before recording anything:
 
 ```text
-Topic
-  -> Research Pack
-  -> Collaborative approved script
-  -> Human narration
-  -> Transcript / forced alignment
-  -> Semantic storyboard
-  -> Visual Router
-      -> Remotion
-      -> Manim
-  -> H.264 draft.mp4
-  -> deterministic QA evidence
-  -> Codex visual / semantic / continuity review
-  -> scene-scoped repair overlays
-  -> rerender only what changed
-  -> accepted final.mp4
+Approved Script
+  -> Estimated Timing
+  -> Semantic Previs Storyboard
+  -> Remotion / Manim
+  -> silent preview.mp4
 ```
 
-QA is evidence-driven rather than score-driven. Videooo extracts real frames from the rendered video and owns structural checks; Codex inspects those frames and submits scene-scoped findings.
+The main project stays in `approved`; Previs does not fake a narration alignment.
 
-Repairs are non-destructive overlays. The approved script, narration, alignment, original storyboard, and base Scene IR remain unchanged. Changed Manim scenes invalidate only their own cache key.
+Later, when the real recording arrives:
 
-The automatic QA loop is capped at three repair rounds before remaining blockers are surfaced to the user.
+```text
+Human Narration
+  -> Transcript / Alignment
+  -> piecewise retime existing Previs storyboard
+  -> production Scene IR
+  -> render / QA
+  -> final.mp4
+```
+
+Scene concepts, teaching goals, visual kinds, content, renderer choices, and transitions are reused. Only timing is remapped to the real narration unless you explicitly ask Codex for a creative redesign.
+
+QA remains evidence-driven: Videooo owns structural checks and real frame extraction; Codex owns visual, semantic, and continuity review. Repairs remain non-destructive overlays.
 
 ## CLI
 
@@ -189,6 +198,16 @@ videooo script list
 videooo script show 1
 videooo script approve 1
 
+# Optional: make a video before narration exists
+videooo previs create
+videooo previs timing
+videooo previs storyboard import previs-storyboard.json
+videooo previs storyboard compile
+videooo previs route show
+videooo previs render
+# preview: .videooo/previs/renders/preview.mp4
+
+# Later, record normally
 videooo narration add narration.m4a
 videooo narration show
 
@@ -199,6 +218,10 @@ videooo align --provider whisper-cpp --model /path/to/model.bin
 videooo align --from-transcript
 videooo alignment show
 
+# If Previs exists, reuse the same visual plan with real timing
+videooo previs promote
+
+# Otherwise import a fresh production storyboard
 videooo storyboard import storyboard.json
 videooo storyboard show
 videooo storyboard compile
@@ -269,6 +292,7 @@ Remotion owns the final composition and global timeline. Manim is a specialized 
 - `apps/cli` — deterministic CLI.
 - `packages/domain` — canonical project, script, narration, timing, and Scene IR contracts.
 - `packages/alignment` — deterministic script/audio forced alignment.
+- `packages/previs` — estimated script timing, silent preview storyboard validation, and late-narration retiming.
 - `packages/transcription` — provider-neutral transcription contract.
 - `packages/transcriber-whisper-cpp` — local whisper.cpp + ffmpeg adapter.
 - `packages/workflow` — production state machine and validators.
@@ -286,6 +310,7 @@ Remotion owns the final composition and global timeline. Manim is a specialized 
 - `docs/specs/m3-storyboard-remotion.md` — storyboard, Scene IR, and first-render specification.
 - `docs/specs/m4-manim-router.md` — mixed Remotion/Manim routing specification.
 - `docs/specs/m5-visual-qa.md` — visual QA and scene-scoped repair specification.
+- `docs/specs/m5.5-previs-late-narration.md` — silent Previs and late-narration retiming specification.
 
 ## Development
 
