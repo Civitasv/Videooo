@@ -1,8 +1,8 @@
-import type { RendererAdapter, SceneIR } from '@videooo/domain'
+import type { RendererAdapter } from '@videooo/domain'
 
 export const manimRenderer: RendererAdapter = {
   kind: 'manim',
-  supports(scene: SceneIR): boolean {
-    return scene.renderer === 'manim'
+  supports(): boolean {
+    return false
   },
 }
