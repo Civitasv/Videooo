@@ -13,13 +13,17 @@ import {
   acceptScriptVersion,
   acceptTranscript,
   approveScriptVersion,
+  assertQaReportPasses,
   buildNarrationAlignment,
+  buildQaReport,
   compileStoryboard,
   createProject,
+  parseQaReviewArtifact,
   parseResearchPack,
   parseScriptVersion,
   parseStoryboardArtifact,
   parseTranscriptArtifact,
+  prepareQaEvidence,
   transitionProject,
 } from '@videooo/core'
 
@@ -77,6 +81,9 @@ async function main(): Promise<void> {
     case 'render':
       await handleRender(args)
       return
+    case 'qa':
+      await handleQa(args)
+      return
     default:
       throw new Error(`Unknown command: ${command}`)
   }
@@ -126,6 +133,8 @@ async function handleStatus(): Promise<void> {
         sceneCount: project.sceneCount ?? 0,
         hasRender: await store.hasRenderManifest(),
         renderId: project.renderId ?? null,
+        qaRunId: project.qaRunId ?? null,
+        qaReportId: project.qaReportId ?? null,
       },
       null,
       2,
@@ -752,6 +761,154 @@ async function handleRender(args: string[]): Promise<void> {
   )
 }
 
+async function handleQa(args: string[]): Promise<void> {
+  const [action, argument] = args
+  const store = new ProjectStore()
+  let project = await store.loadProject()
+
+  if (action === 'prepare') {
+    if (project.stage !== 'qa') {
+      throw new Error(
+        `QA prepare requires stage "qa"; current stage is "${project.stage}"`,
+      )
+    }
+    const approvedScriptVersionId = project.approvedScriptVersionId
+    if (
+      project.renderId === undefined ||
+      project.storyboardId === undefined ||
+      project.alignmentId === undefined ||
+      approvedScriptVersionId === undefined
+    ) {
+      throw new Error('Project is missing render/storyboard/alignment/script metadata')
+    }
+
+    const render = await store.loadRenderManifest()
+    const alignment = await store.loadAlignment()
+    const script = await store.loadScriptVersionById(approvedScriptVersionId)
+    const scenes = await store.listScenes()
+    const sceneRenderIndex = await store.loadSceneRenderIndex()
+    const manimAssetPaths = Object.fromEntries(
+      sceneRenderIndex.assets.map((asset) => [
+        asset.sceneId,
+        resolve(store.sceneRendersDirectory, asset.fileName),
+      ]),
+    )
+    const runId = await store.nextQaRunId()
+    const evidence = await prepareQaEvidence({
+      project,
+      render,
+      alignment,
+      script,
+      scenes,
+      sceneRenderAssets: sceneRenderIndex.assets,
+      manimAssetPaths,
+      videoPath: resolveRenderOutputPath(store, render.outputPath),
+      videoPathLabel: render.outputPath,
+      framesDirectory: store.qaFramesDirectory(runId),
+      evidenceId: runId,
+      ...(optionValue(args, '--ffmpeg') === undefined
+        ? {}
+        : { ffmpegBinary: optionValue(args, '--ffmpeg') }),
+      ...(optionValue(args, '--ffprobe') === undefined
+        ? {}
+        : { ffprobeBinary: optionValue(args, '--ffprobe') }),
+    })
+
+    await store.saveQaEvidence(evidence)
+    project = { ...project, qaRunId: runId }
+    delete project.qaReportId
+    await store.saveProject(project)
+
+    const frameCount = evidence.scenes.reduce(
+      (total, scene) => total + scene.frameSamples.length,
+      0,
+    )
+    console.log(
+      `Prepared QA evidence "${runId}" with ${frameCount} frame(s) and ${evidence.structuralFindings.length} structural finding(s).`,
+    )
+    return
+  }
+
+  const runId = project.qaRunId
+  if (runId === undefined) {
+    throw new Error('No QA run has been prepared.')
+  }
+
+  if (action === 'evidence') {
+    console.log(JSON.stringify(await store.loadQaEvidence(runId), null, 2))
+    return
+  }
+
+  if (action === 'import') {
+    if (project.stage !== 'qa') {
+      throw new Error(
+        `QA import requires stage "qa"; current stage is "${project.stage}"`,
+      )
+    }
+    if (argument === undefined) {
+      throw new Error('Usage: videooo qa import <review.json>')
+    }
+
+    const evidence = await store.loadQaEvidence(runId)
+    const review = parseQaReviewArtifact(
+      await readJsonFile(argument),
+      evidence,
+    )
+    await store.saveQaReview(runId, review)
+    const report = buildQaReport(evidence, review)
+    await store.saveQaReport(runId, report)
+    project = { ...project, qaReportId: report.id }
+    await store.saveProject(project)
+
+    console.log(
+      `Imported QA review "${review.id}": ${report.status}, ${report.blockingFindingIds.length} blocking finding(s).`,
+    )
+    return
+  }
+
+  if (action === 'report') {
+    console.log(JSON.stringify(await store.loadQaReport(runId), null, 2))
+    return
+  }
+
+  if (action === 'accept') {
+    if (project.stage !== 'qa') {
+      throw new Error(
+        `QA accept requires stage "qa"; current stage is "${project.stage}"`,
+      )
+    }
+    const report = await store.loadQaReport(runId)
+    if (project.qaReportId !== report.id) {
+      throw new Error('Latest QA report does not match project metadata')
+    }
+    assertQaReportPasses(report)
+    const render = await store.loadRenderManifest()
+    await store.acceptRenderAsFinal(
+      resolveRenderOutputPath(store, render.outputPath),
+    )
+    project = transitionProject(project, 'done')
+    await store.saveProject(project)
+    console.log(
+      `QA accepted. Final video copied to ${store.finalRenderPath}.`,
+    )
+    return
+  }
+
+  throw new Error(
+    'Usage: videooo qa <prepare|evidence|import <review.json>|report|accept> [--ffmpeg <path>] [--ffprobe <path>]',
+  )
+}
+
+function resolveRenderOutputPath(
+  store: ProjectStore,
+  outputPath: string,
+): string {
+  if (outputPath === 'renders/draft.mp4') {
+    return store.draftRenderPath
+  }
+  return resolve(process.cwd(), outputPath)
+}
+
 async function readJsonFile(path: string): Promise<unknown> {
   return JSON.parse(
     await readFile(resolve(process.cwd(), path), 'utf8'),
@@ -821,7 +978,12 @@ Usage:
   videooo manim check [--manim-bin <path>]
   videooo manim render <scene-id> [--manim-bin <path>]
   videooo manim render-all [--manim-bin <path>]
-  videooo render [--output <file>] [--manim-bin <path>] [--ffprobe <path>]`)
+  videooo render [--output <file>] [--manim-bin <path>] [--ffprobe <path>]
+  videooo qa prepare [--ffmpeg <path>] [--ffprobe <path>]
+  videooo qa evidence
+  videooo qa import <review.json>
+  videooo qa report
+  videooo qa accept`)
 }
 
 try {
