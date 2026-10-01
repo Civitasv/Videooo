@@ -37,7 +37,10 @@ describe('Previs timing', () => {
 describe('Previs storyboard', () => {
   it('validates and compiles against estimated timing', () => {
     const timing = estimateScriptTiming(project(), script(), { id: 'timing' })
-    const board = storyboard(timing.durationMs)
+    const board = storyboard(
+      timing.durationMs,
+      timing.sections[1]!.startMs,
+    )
 
     expect(parsePrevisStoryboardArtifact(board, project(), timing)).toEqual(board)
     expect(compilePrevisStoryboard(board)).toHaveLength(2)
@@ -45,7 +48,10 @@ describe('Previs storyboard', () => {
 
   it('retimes the same visual plan to real narration', () => {
     const timing = estimateScriptTiming(project(), script(), { id: 'timing' })
-    const board = storyboard(timing.durationMs)
+    const board = storyboard(
+      timing.durationMs,
+      timing.sections[1]!.startMs,
+    )
     const promoted = promotePrevisStoryboard(board, timing, alignment())
 
     expect(promoted.alignmentId).toBe('alignment')
@@ -62,7 +68,11 @@ describe('Previs storyboard', () => {
     delete real.sections[1]!.startMs
 
     expect(() =>
-      promotePrevisStoryboard(storyboard(timing.durationMs), timing, real),
+      promotePrevisStoryboard(
+        storyboard(timing.durationMs, timing.sections[1]!.startMs),
+        timing,
+        real,
+      ),
     ).toThrow('has no start time')
   })
 })
@@ -107,8 +117,10 @@ function script(): ScriptVersion {
   }
 }
 
-function storyboard(durationMs: number): PrevisStoryboardArtifact {
-  const split = Math.round(durationMs * 0.4)
+function storyboard(
+  durationMs: number,
+  split: number,
+): PrevisStoryboardArtifact {
   return {
     schemaVersion: 1,
     id: 'storyboard',
