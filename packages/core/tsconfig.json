@@ -9,6 +9,7 @@
     { "path": "../alignment" },
     { "path": "../domain" },
     { "path": "../project-store" },
+    { "path": "../storyboard" },
     { "path": "../workflow" }
   ],
   "include": ["src/**/*.ts"]
