@@ -51,6 +51,29 @@ videooo --version
 
 If pnpm reports that its global bin directory is not configured, run `pnpm setup`, restart the shell, and rerun `pnpm install:cli`.
 
+### Update Videooo later
+
+You do not need to run `pnpm install:cli` again for normal updates. The global CLI is linked back to the checkout.
+
+From any directory:
+
+```bash
+videooo update
+```
+
+The update command:
+
+1. resolves the Videooo checkout from the linked CLI itself;
+2. refuses to continue when tracked files have local modifications;
+3. runs `git pull --ff-only` on the current branch/upstream;
+4. runs `pnpm install`, `pnpm build`, and packaged-skill validation;
+5. verifies the globally linked `videooo` command;
+6. refreshes the configured `videooo-marketplace` through Codex when the Codex CLI is available.
+
+It never auto-stashes, resets, rebases, or force-updates the checkout. If the Codex marketplace is not configured, the CLI update still succeeds and prints a warning.
+
+Start a new Codex session (or restart the desktop app) after an update so refreshed skills are loaded.
+
 ### One-time local narration setup
 
 M2 uses local whisper.cpp by default. On macOS with Homebrew:

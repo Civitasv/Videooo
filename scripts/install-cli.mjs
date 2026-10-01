@@ -31,6 +31,7 @@ if (verification.status !== 0) {
 }
 
 console.log(`Videooo CLI installed: ${verification.stdout.trim()}`)
+console.log('Future updates: run "videooo update" from any directory.')
 
 function run(command, args, label) {
   console.log(`==> ${label}`)
