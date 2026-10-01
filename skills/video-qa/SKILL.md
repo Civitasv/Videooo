@@ -143,7 +143,16 @@ First inspect blocking findings.
 
 Do **not** create a visual repair overlay for structural errors.
 
-Fix the actual prerequisite or project/render issue, then prepare evidence again or rerender as appropriate.
+Fix the actual prerequisite or project/render issue.
+
+If the final render itself must be regenerated, run:
+
+```bash
+videooo qa rerender
+videooo render
+```
+
+If only evidence extraction failed (for example ffmpeg was unavailable), fix the prerequisite and run `videooo qa prepare` again without rerendering.
 
 ### Visual / semantic / continuity error
 
