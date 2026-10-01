@@ -7,7 +7,7 @@ description: Orchestrate a Videooo educational-video project in the current work
 
 Use this skill when the user asks to create, start, continue, or inspect an educational-video project with Videooo.
 
-Videooo is script-first, human-narrated, and audio-synchronized. The current implementation covers topic -> research -> collaborative script -> explicit approval.
+Videooo is script-first, human-narrated, and audio-synchronized. The current implementation covers topic -> research -> collaborative script -> explicit approval -> narration import -> transcription/alignment.
 
 ## Runtime boundary
 
@@ -75,9 +75,34 @@ videooo script approve <version>
 
 ### approved
 
-The script is locked for narration. M2 narration import/alignment is not implemented yet. Report that the user can now record the approved narration and that Videooo currently stops at this milestone boundary.
+The script is locked for narration.
 
-### recorded / aligned / storyboarded / rendering / qa / done
+- Tell the user which script version is approved and ready to record.
+- The user records it with their preferred microphone/recording app.
+- When the user provides or identifies the audio file, use the `narration` skill.
+- Import the audio through `videooo narration add <file>`; never copy it manually into project state.
+
+### recorded
+
+Use the `narration` skill.
+
+Prefer the local whisper.cpp path when ffmpeg, whisper-cli, and a model are configured:
+
+```bash
+videooo align --provider whisper-cpp --model <model-path>
+```
+
+If local transcription is not configured, report the missing prerequisite or use a user-provided canonical timed transcript. Never fabricate timestamps.
+
+If alignment coverage is below the quality gate, discuss the deviations with the user. Do not use `--accept-low-coverage` unless the user explicitly accepts that tradeoff.
+
+### aligned
+
+Run `videooo status` and, when useful, `videooo alignment show`.
+
+Report duration, coverage, significant deviations, and whether section timing is available. The project is now ready for M3 storyboard generation.
+
+### storyboarded / rendering / qa / done
 
 Follow the implemented capabilities available in the current Videooo version. Never fabricate missing milestone behavior.
 

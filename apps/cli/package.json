@@ -7,6 +7,7 @@
     "videooo": "./.build/index.js"
   },
   "dependencies": {
-    "@videooo/core": "workspace:*"
+    "@videooo/core": "workspace:*",
+    "@videooo/transcriber-whisper-cpp": "workspace:*"
   }
 }

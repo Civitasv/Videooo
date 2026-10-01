@@ -7,8 +7,8 @@
     "types": ["node"]
   },
   "references": [
-    { "path": "../../packages/core" },
-    { "path": "../../packages/transcriber-whisper-cpp" }
+    { "path": "../domain" },
+    { "path": "../transcription" }
   ],
   "include": ["src/**/*.ts"]
 }
