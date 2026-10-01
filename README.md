@@ -74,6 +74,25 @@ export VIDEOOO_FFMPEG_BIN=/path/to/ffmpeg
 
 The default M2 path is local-only: narration audio is not uploaded to a cloud transcription service.
 
+### Optional Manim setup
+
+M4 uses Manim Community for equation, plot, vector, and algorithm scenes. On macOS, the simplest current installation is:
+
+```bash
+brew install manim
+manim --version
+```
+
+Videooo M4 expects Manim 0.21.x. You can override the executable with:
+
+```bash
+export VIDEOOO_MANIM_BIN=/path/to/manim
+```
+
+Equation scenes currently use Manim `MathTex`, so install a LaTeX distribution (for example MacTeX on macOS) if you want equation rendering. Plot/vector/algorithm scenes do not require LaTeX.
+
+If a project contains only Remotion-routed scenes, Manim is not required.
+
 Add the Videooo marketplace to Codex:
 
 ```bash
@@ -124,27 +143,27 @@ The installed plugin, CLI, skills, and future renderers are shared. They are not
 
 ## Current milestone
 
-M3 is implemented:
+M4 is implemented:
 
 ```text
 Topic
   -> Research Pack
   -> Collaborative approved script
   -> Human narration
-  -> Local/provider-neutral transcript
-  -> Forced alignment
+  -> Transcript / forced alignment
   -> Semantic storyboard
-  -> Declarative Scene IR
-  -> Shared Remotion runtime
+  -> Visual Router
+      -> Remotion: title / typography / code / diagram / summary
+      -> Manim: equation / plot / vector / algorithm
+  -> cached Manim scene clips
+  -> Remotion final timeline + human narration
   -> H.264 draft.mp4
   -> QA boundary
 ```
 
-After alignment, Codex uses the packaged `storyboard` skill to plan five deterministic visual families: title, typography, code, diagram, and summary.
+The storyboard stays declarative. Codex does not write per-project React or arbitrary Python.
 
-Video projects do not get their own React application. The installed Videooo runtime owns the common component library, design system, narration composition, and Remotion server renderer.
-
-M4 will add Manim routing for mathematical/scientific scenes that need richer spatial animation.
+Videooo generates Manim source from fixed templates, renders only the scenes that need Manim, then embeds those silent clips inside the final Remotion composition. Human narration remains one global audio track.
 
 ## CLI
 
@@ -180,8 +199,13 @@ videooo storyboard import storyboard.json
 videooo storyboard show
 videooo storyboard compile
 videooo scenes list
+videooo route show
+
+videooo manim check
+videooo manim render-all
 
 videooo render
+# automatically renders missing Manim scenes
 # default: .videooo/renders/draft.mp4
 ```
 
@@ -229,13 +253,16 @@ Remotion owns the final composition and global timeline. Manim is a specialized 
 - `packages/workflow` — production state machine and validators.
 - `packages/project-store` — filesystem project persistence.
 - `packages/core` — stable public facade.
-- `packages/storyboard` — semantic storyboard validation, Scene IR compilation, and frame planning.
+- `packages/storyboard` — semantic storyboard validation, mixed Scene IR compilation, and frame planning.
+- `packages/visual-router` — deterministic Remotion/Manim routing.
+- `packages/manim-worker` — fixed-template Manim source generation, local rendering, and cache keys.
 - `packages/renderer-remotion` — fixed Remotion component library and real H.264 renderer.
-- `packages/renderer-manim` — Manim adapter boundary.
+- `packages/renderer-manim` — Manim renderer capability marker.
 - `docs/specs/v1.md` — full V1 product specification.
 - `docs/specs/m1.5-codex-distribution.md` — Codex distribution specification.
 - `docs/specs/m2-narration-alignment.md` — human narration and alignment specification.
 - `docs/specs/m3-storyboard-remotion.md` — storyboard, Scene IR, and first-render specification.
+- `docs/specs/m4-manim-router.md` — mixed Remotion/Manim routing specification.
 
 ## Development
 
