@@ -27,6 +27,7 @@ export interface RenderRemotionVideoInput {
   narrationSourcePath: string
   workspaceDirectory: string
   outputLocation: string
+  manimSceneAssets?: Record<string, string>
   logLevel?: 'verbose' | 'info' | 'warn' | 'error'
 }
 
@@ -55,6 +56,22 @@ export async function renderRemotionVideo(
     resolve(publicDirectory, narrationFile),
   )
 
+  const manimAssets: Record<string, string> = {}
+  const manimPublicDirectory = resolve(publicDirectory, 'manim')
+  for (const scene of input.scenes) {
+    if (scene.renderer !== 'manim') continue
+
+    const source = input.manimSceneAssets?.[scene.id]
+    if (source === undefined) {
+      throw new Error(`Missing Manim asset path for scene "${scene.id}"`)
+    }
+
+    await mkdir(manimPublicDirectory, { recursive: true })
+    const fileName = `${safeAssetName(scene.id)}.mp4`
+    await copyFile(resolve(source), resolve(manimPublicDirectory, fileName))
+    manimAssets[scene.id] = `manim/${fileName}`
+  }
+
   const framePlans = planSceneFrames(
     input.scenes,
     input.video.fps,
@@ -67,6 +84,7 @@ export async function renderRemotionVideo(
     video: input.video,
     durationMs: input.durationMs,
     narrationFile,
+    manimAssets,
   }
 
   const outputLocation = resolve(input.outputLocation)
@@ -110,6 +128,12 @@ export async function renderRemotionVideo(
   } finally {
     await rm(serveUrl, { recursive: true, force: true }).catch(() => {})
   }
+}
+
+function safeAssetName(value: string): string {
+  const safe = value.replace(/[^a-zA-Z0-9._-]+/g, '-')
+  if (safe.length === 0) throw new Error('Scene id cannot form an asset name')
+  return safe
 }
 
 function safeAudioExtension(path: string): string {
