@@ -106,3 +106,35 @@ jobs:
         env:
           VIDEOOO_MANIM_BIN: ${{ github.workspace }}/.venv-manim/bin/manim
         run: pnpm mixed:smoke
+
+  qa-smoke:
+    name: Render + QA evidence smoke
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.20.0
+
+      - name: Install Node dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Render and prepare real QA evidence
+        run: pnpm qa:smoke
