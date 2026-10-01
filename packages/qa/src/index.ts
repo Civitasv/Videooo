@@ -2,19 +2,26 @@ import { spawnSync } from 'node:child_process'
 import { mkdir, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type {
+  M4VisualKind,
   NarrationAlignment,
   QaEvidencePack,
   QaFinding,
   QaFrameSample,
+  QaRepairOverlay,
   QaReport,
   QaReviewArtifact,
   QaSceneEvidence,
+  SceneContent,
   SceneIR,
   SceneRenderAsset,
   ScriptVersion,
   VideoProjectManifest,
   VideoRenderManifest,
 } from '@videooo/domain'
+import {
+  routeVisualKind,
+  validateM4SceneContent,
+} from '@videooo/visual-router'
 
 const SAMPLE_PROGRESS = [0.1, 0.5, 0.9] as const
 
@@ -576,4 +583,288 @@ function requireString(
   if (typeof value !== 'string' || value.trim().length === 0) {
     issues.push(`${path} must be a non-empty string`)
   }
+}
+
+export function parseQaRepairOverlay(
+  value: unknown,
+  project: VideoProjectManifest,
+  report: QaReport,
+  baseScenes: readonly SceneIR[],
+): QaRepairOverlay {
+  if (!isRecord(value)) {
+    throw new Error('Invalid QA Repair: artifact must be a JSON object')
+  }
+
+  const issues: string[] = []
+  if (value.schemaVersion !== 1) issues.push('schemaVersion must be 1')
+  requireString(value.id, 'id', issues)
+  requireString(value.projectId, 'projectId', issues)
+  requireString(value.qaReportId, 'qaReportId', issues)
+  requireString(value.createdAt, 'createdAt', issues)
+
+  if (value.projectId !== project.id) {
+    issues.push(`projectId must be "${project.id}"`)
+  }
+  if (value.qaReportId !== report.id) {
+    issues.push(`qaReportId must be "${report.id}"`)
+  }
+  if (report.status !== 'fail') {
+    issues.push('repairs require a failing QA report')
+  }
+
+  const scenes = new Map(baseScenes.map((scene) => [scene.id, scene]))
+  const findings = new Map(report.findings.map((finding) => [finding.id, finding]))
+  const blocking = new Set(report.blockingFindingIds)
+  const repairedScenes = new Set<string>()
+
+  if (!Array.isArray(value.sceneRepairs) || value.sceneRepairs.length === 0) {
+    issues.push('sceneRepairs must contain at least one repair')
+  } else {
+    for (const [index, raw] of value.sceneRepairs.entries()) {
+      const path = `sceneRepairs[${index}]`
+      if (!isRecord(raw)) {
+        issues.push(`${path} must be an object`)
+        continue
+      }
+
+      requireString(raw.sceneId, `${path}.sceneId`, issues)
+      if (typeof raw.sceneId !== 'string') continue
+      const scene = scenes.get(raw.sceneId)
+      if (scene === undefined) {
+        issues.push(`${path}.sceneId references unknown scene "${raw.sceneId}"`)
+        continue
+      }
+      if (repairedScenes.has(raw.sceneId)) {
+        issues.push(`duplicate repair for scene "${raw.sceneId}"`)
+      }
+      repairedScenes.add(raw.sceneId)
+
+      if (!Array.isArray(raw.findingIds) || raw.findingIds.length === 0) {
+        issues.push(`${path}.findingIds must contain blocking finding IDs`)
+      } else {
+        for (const findingId of raw.findingIds) {
+          if (typeof findingId !== 'string' || !blocking.has(findingId)) {
+            issues.push(
+              `${path}.findingIds references non-blocking finding "${String(findingId)}"`,
+            )
+            continue
+          }
+          const finding = findings.get(findingId)
+          if (finding?.category === 'structural') {
+            issues.push(
+              `${path}.finding "${findingId}" is structural and cannot be fixed by a scene overlay`,
+            )
+          }
+          if (
+            finding !== undefined &&
+            finding.sceneId !== raw.sceneId
+          ) {
+            issues.push(
+              `${path}.finding "${findingId}" belongs to scene "${finding.sceneId}"`,
+            )
+          }
+        }
+      }
+
+      const hasMutation =
+        raw.visualKind !== undefined ||
+        raw.content !== undefined ||
+        raw.transition !== undefined ||
+        raw.direction !== undefined
+      if (!hasMutation) {
+        issues.push(`${path} does not change any visual field`)
+      }
+
+      let kind = scene.visualKind
+      if (raw.visualKind !== undefined) {
+        if (!isVisualKind(raw.visualKind)) {
+          issues.push(`${path}.visualKind is unsupported`)
+        } else {
+          kind = raw.visualKind
+        }
+      }
+
+      if (
+        raw.transition !== undefined &&
+        raw.transition !== 'cut' &&
+        raw.transition !== 'fade' &&
+        raw.transition !== 'slide'
+      ) {
+        issues.push(`${path}.transition is invalid`)
+      }
+
+      if (
+        raw.direction !== undefined &&
+        (typeof raw.direction !== 'string' ||
+          raw.direction.trim().length === 0)
+      ) {
+        issues.push(`${path}.direction must be a non-empty string`)
+      }
+
+      let content: SceneContent = scene.content
+      if (raw.content !== undefined) {
+        if (!isRecord(raw.content) || typeof raw.content.type !== 'string') {
+          issues.push(`${path}.content must be a scene content object`)
+        } else {
+          content = raw.content as unknown as SceneContent
+        }
+      }
+
+      if (
+        raw.visualKind !== undefined &&
+        raw.content === undefined &&
+        kind !== scene.visualKind
+      ) {
+        issues.push(
+          `${path}.content is required when changing visualKind`,
+        )
+      }
+
+      if (isVisualKind(kind)) {
+        for (const issue of validateRepairContent(kind, content)) {
+          issues.push(`${path}.content ${issue}`)
+        }
+      }
+    }
+  }
+
+  if (issues.length > 0) {
+    throw new Error(`Invalid QA Repair:\n- ${issues.join('\n- ')}`)
+  }
+
+  return value as unknown as QaRepairOverlay
+}
+
+export function applyQaRepairOverlays(
+  baseScenes: readonly SceneIR[],
+  overlays: readonly QaRepairOverlay[],
+): SceneIR[] {
+  const byId = new Map(
+    baseScenes.map((scene) => [scene.id, structuredClone(scene)]),
+  )
+
+  for (const overlay of overlays) {
+    for (const repair of overlay.sceneRepairs) {
+      const current = byId.get(repair.sceneId)
+      if (current === undefined) {
+        throw new Error(
+          `Repair "${overlay.id}" references missing scene "${repair.sceneId}"`,
+        )
+      }
+
+      const visualKind = repair.visualKind ?? current.visualKind
+      const content =
+        repair.content === undefined
+          ? current.content
+          : structuredClone(repair.content)
+      const next: SceneIR = {
+        ...current,
+        renderer: routeVisualKind(visualKind),
+        visualKind,
+        content,
+        transition: repair.transition ?? current.transition,
+        ...(repair.direction === undefined
+          ? current.direction === undefined
+            ? {}
+            : { direction: current.direction }
+          : { direction: repair.direction }),
+      }
+      byId.set(current.id, next)
+    }
+  }
+
+  return baseScenes.map((scene) => {
+    const effective = byId.get(scene.id)
+    if (effective === undefined) {
+      throw new Error(`Effective scene "${scene.id}" is missing`)
+    }
+    return effective
+  })
+}
+
+function validateRepairContent(
+  kind: M4VisualKind,
+  content: SceneContent,
+): string[] {
+  const issues = [...validateM4SceneContent(kind, content)]
+  if (content.type !== kind) return issues
+
+  switch (content.type) {
+    case 'title':
+      if (content.title.trim().length === 0) {
+        issues.push('title must be non-empty')
+      }
+      break
+    case 'typography':
+      if (content.headline.trim().length === 0) {
+        issues.push('headline must be non-empty')
+      }
+      break
+    case 'code':
+      if (content.code.trim().length === 0) {
+        issues.push('code must be non-empty')
+      }
+      break
+    case 'diagram': {
+      if (content.nodes.length === 0) {
+        issues.push('diagram requires nodes')
+        break
+      }
+      const ids = new Set<string>()
+      for (const node of content.nodes) {
+        if (node.id.trim().length === 0 || node.label.trim().length === 0) {
+          issues.push('diagram node id/label must be non-empty')
+        }
+        if (ids.has(node.id)) {
+          issues.push(`duplicate diagram node "${node.id}"`)
+        }
+        ids.add(node.id)
+        if (
+          !Number.isFinite(node.x) ||
+          !Number.isFinite(node.y) ||
+          node.x < 0 ||
+          node.x > 1 ||
+          node.y < 0 ||
+          node.y > 1
+        ) {
+          issues.push(`diagram node "${node.id}" coordinates must be 0..1`)
+        }
+      }
+      for (const edge of content.edges) {
+        if (!ids.has(edge.from) || !ids.has(edge.to)) {
+          issues.push(
+            `diagram edge "${edge.from}->${edge.to}" references unknown node`,
+          )
+        }
+      }
+      break
+    }
+    case 'summary':
+      if (
+        content.title.trim().length === 0 ||
+        content.bullets.length === 0 ||
+        content.bullets.some((bullet) => bullet.trim().length === 0)
+      ) {
+        issues.push('summary title/bullets must be non-empty')
+      }
+      break
+    default:
+      break
+  }
+
+  return issues
+}
+
+function isVisualKind(value: unknown): value is M4VisualKind {
+  return (
+    value === 'title' ||
+    value === 'typography' ||
+    value === 'code' ||
+    value === 'diagram' ||
+    value === 'summary' ||
+    value === 'equation' ||
+    value === 'plot' ||
+    value === 'vector' ||
+    value === 'algorithm'
+  )
 }
