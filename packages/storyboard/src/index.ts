@@ -122,6 +122,7 @@ export function compileStoryboard(
     visualKind: scene.visualKind,
     content: structuredClone(scene.content),
     transition: scene.transition ?? 'fade',
+    direction: scene.direction,
   }))
 }
 
