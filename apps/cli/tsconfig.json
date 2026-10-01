@@ -8,6 +8,7 @@
   },
   "references": [
     { "path": "../../packages/core" },
+    { "path": "../../packages/manim-worker" },
     { "path": "../../packages/renderer-remotion" },
     { "path": "../../packages/transcriber-whisper-cpp" }
   ],
