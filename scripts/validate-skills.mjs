@@ -8,6 +8,7 @@ const requiredSkills = new Set([
   'research',
   'script',
   'narration',
+  'previs',
   'storyboard',
   'video-qa',
 ])
