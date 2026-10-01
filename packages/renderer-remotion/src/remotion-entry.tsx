@@ -10,6 +10,7 @@ const defaultProps: VideoooRenderProps = {
   video: { width: 1920, height: 1080, fps: 30 },
   durationMs: 1000,
   narrationFile: 'narration.wav',
+  manimAssets: {},
 }
 
 function VideoooRoot() {

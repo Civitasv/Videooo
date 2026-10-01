@@ -11,3 +11,4 @@ coverage/
 .videooo/renders/
 .videooo/tmp/
 .videooo/render-workspace/
+.videooo/manim/

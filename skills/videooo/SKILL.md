@@ -7,7 +7,7 @@ description: Orchestrate a Videooo educational-video project in the current work
 
 Use this skill when the user asks to create, start, continue, or inspect an educational-video project with Videooo.
 
-Videooo is script-first, human-narrated, and audio-synchronized. The current implementation covers topic -> research -> collaborative script -> explicit approval -> narration import -> transcription/alignment.
+Videooo is script-first, human-narrated, and audio-synchronized. The current implementation covers research, collaborative script approval, human narration alignment, semantic storyboard planning, mixed Remotion/Manim rendering, and a draft-video QA boundary.
 
 ## Runtime boundary
 
@@ -104,13 +104,21 @@ Report duration, coverage, significant deviations, and section timing. Then use 
 
 ### storyboarded
 
-The Scene IR is compiled. Render with the shared installed runtime:
+The Scene IR is compiled and already contains deterministic renderer routing.
+
+Inspect when useful:
+
+```bash
+videooo route show
+```
+
+Then render:
 
 ```bash
 videooo render
 ```
 
-Do not generate a separate per-project React application.
+Videooo automatically renders/caches required Manim scenes and then composes the complete timeline in Remotion. Do not generate a separate React app or arbitrary Manim Python.
 
 ### rendering
 
