@@ -447,6 +447,7 @@ export interface SceneIR {
   visualKind: M4VisualKind
   content: SceneContent
   transition: SceneTransition
+  direction?: string
 }
 
 export interface SceneRenderAsset {
@@ -554,6 +555,24 @@ export interface QaReport {
   status: 'pass' | 'fail'
 }
 
+export interface QaSceneRepair {
+  sceneId: string
+  findingIds: string[]
+  visualKind?: M4VisualKind
+  content?: SceneContent
+  transition?: SceneTransition
+  direction?: string
+}
+
+export interface QaRepairOverlay {
+  schemaVersion: 1
+  id: string
+  projectId: string
+  qaReportId: string
+  createdAt: string
+  sceneRepairs: QaSceneRepair[]
+}
+
 export interface VideoProjectManifest {
   schemaVersion: 1
   id: string
@@ -574,6 +593,7 @@ export interface VideoProjectManifest {
   renderId?: string
   qaRunId?: string
   qaReportId?: string
+  qaRepairIds?: string[]
 }
 
 export interface RendererAdapter {

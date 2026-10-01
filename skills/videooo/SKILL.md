@@ -7,7 +7,7 @@ description: Orchestrate a Videooo educational-video project in the current work
 
 Use this skill when the user asks to create, start, continue, or inspect an educational-video project with Videooo.
 
-Videooo is script-first, human-narrated, and audio-synchronized. The current implementation covers research, collaborative script approval, human narration alignment, semantic storyboard planning, mixed Remotion/Manim rendering, and a draft-video QA boundary.
+Videooo is script-first, human-narrated, and audio-synchronized. The current implementation covers research, collaborative script approval, human narration alignment, mixed Remotion/Manim rendering, visual QA, scene-scoped repair, and final acceptance.
 
 ## Runtime boundary
 
@@ -126,9 +126,18 @@ A previous render started but did not reach QA. Inspect the error and rerun `vid
 
 ### qa
 
-A draft MP4 exists. Report the output from `videooo status` / project render metadata. Automated visual QA and scene regeneration belong to M5; do not pretend they have run.
+Use the `video-qa` skill.
+
+Prepare real frame evidence, inspect it, import a QA review, and either:
+
+- accept a passing report; or
+- create a scene-scoped repair overlay, rerender, and repeat.
+
+Stop after at most three automatic repair rounds.
 
 ### done
+
+The accepted video is `.videooo/renders/final.mp4`. Report the final path and the accepted QA status.
 
 Follow the implemented capabilities available in the current Videooo version. Never fabricate missing milestone behavior.
 
