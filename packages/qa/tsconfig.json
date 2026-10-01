@@ -6,6 +6,9 @@
     "tsBuildInfoFile": ".build/.tsbuildinfo",
     "types": ["node"]
   },
-  "references": [{ "path": "../domain" }],
+  "references": [
+    { "path": "../domain" },
+    { "path": "../visual-router" }
+  ],
   "include": ["src/**/*.ts"]
 }
