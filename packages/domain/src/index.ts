@@ -496,6 +496,62 @@ export interface QaFinding {
   severity: 'info' | 'warning' | 'error'
   category: 'structural' | 'visual' | 'semantic' | 'continuity'
   message: string
+  evidenceFrameIds?: string[]
+  repairHint?: string
+}
+
+export interface QaFrameSample {
+  id: string
+  sceneId: string
+  timeMs: number
+  localProgress: number
+  fileName: string
+}
+
+export interface QaSceneEvidence {
+  sceneId: string
+  renderer: RendererKind
+  visualKind: M4VisualKind
+  teachingGoal: string
+  startMs: number
+  endMs: number
+  narrationText: string
+  frameSamples: QaFrameSample[]
+}
+
+export interface QaEvidencePack {
+  schemaVersion: 1
+  id: string
+  projectId: string
+  renderId: string
+  storyboardId: string
+  alignmentId: string
+  createdAt: string
+  videoPath: string
+  durationMs: number
+  scenes: QaSceneEvidence[]
+  structuralFindings: QaFinding[]
+}
+
+export interface QaReviewArtifact {
+  schemaVersion: 1
+  id: string
+  projectId: string
+  evidenceId: string
+  createdAt: string
+  findings: QaFinding[]
+}
+
+export interface QaReport {
+  schemaVersion: 1
+  id: string
+  projectId: string
+  evidenceId: string
+  renderId: string
+  createdAt: string
+  findings: QaFinding[]
+  blockingFindingIds: string[]
+  status: 'pass' | 'fail'
 }
 
 export interface VideoProjectManifest {
@@ -516,6 +572,8 @@ export interface VideoProjectManifest {
   styleId?: string
   sceneCount?: number
   renderId?: string
+  qaRunId?: string
+  qaReportId?: string
 }
 
 export interface RendererAdapter {
