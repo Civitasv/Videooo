@@ -5,12 +5,6 @@
     "outDir": ".build",
     "tsBuildInfoFile": ".build/.tsbuildinfo"
   },
-  "references": [
-    { "path": "../alignment" },
-    { "path": "../domain" },
-    { "path": "../project-store" },
-    { "path": "../storyboard" },
-    { "path": "../workflow" }
-  ],
+  "references": [{ "path": "../domain" }],
   "include": ["src/**/*.ts"]
 }

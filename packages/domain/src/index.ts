@@ -231,6 +231,121 @@ export interface NarrationAlignment {
   sections: AlignedSection[]
 }
 
+export type M3VisualKind =
+  | 'title'
+  | 'typography'
+  | 'code'
+  | 'diagram'
+  | 'summary'
+
+export type SceneTransition = 'cut' | 'fade' | 'slide'
+
+export interface TitleSceneContent {
+  type: 'title'
+  eyebrow?: string
+  title: string
+  subtitle?: string
+}
+
+export interface TypographySceneContent {
+  type: 'typography'
+  headline: string
+  body?: string
+  emphasis?: string[]
+}
+
+export interface CodeSceneContent {
+  type: 'code'
+  title?: string
+  language?: string
+  code: string
+  highlightedLines?: number[]
+  annotation?: string
+}
+
+export interface DiagramNode {
+  id: string
+  label: string
+  x: number
+  y: number
+  emphasis?: boolean
+}
+
+export interface DiagramEdge {
+  from: string
+  to: string
+  label?: string
+}
+
+export interface DiagramSceneContent {
+  type: 'diagram'
+  title?: string
+  nodes: DiagramNode[]
+  edges: DiagramEdge[]
+}
+
+export interface SummarySceneContent {
+  type: 'summary'
+  title: string
+  bullets: string[]
+}
+
+export type SceneContent =
+  | TitleSceneContent
+  | TypographySceneContent
+  | CodeSceneContent
+  | DiagramSceneContent
+  | SummarySceneContent
+
+export interface VideoFormat {
+  width: number
+  height: number
+  fps: number
+}
+
+export interface StoryboardScene {
+  id: string
+  startMs: number
+  endMs: number
+  sectionIds: string[]
+  teachingGoal: string
+  visualKind: M3VisualKind
+  direction: string
+  content: SceneContent
+  transition?: SceneTransition
+}
+
+export interface StoryboardArtifact {
+  schemaVersion: 1
+  id: string
+  projectId: string
+  alignmentId: string
+  createdAt: string
+  video: VideoFormat
+  scenes: StoryboardScene[]
+}
+
+export interface VideoStyle {
+  schemaVersion: 1
+  id: string
+  background: string
+  surface: string
+  foreground: string
+  muted: string
+  accent: string
+  accentSoft: string
+  fontFamily: string
+  monoFontFamily: string
+  safeAreaPx: number
+  radiusPx: number
+}
+
+export interface SceneFramePlan {
+  sceneId: string
+  from: number
+  durationInFrames: number
+}
+
 export interface NarrationSegment {
   id: string
   startMs: number
@@ -259,15 +374,18 @@ export interface SceneAction {
 }
 
 export interface SceneIR {
+  schemaVersion: 1
   id: string
+  projectId: string
+  storyboardId: string
   startMs: number
   durationMs: number
-  narrationSegmentIds: string[]
+  sectionIds: string[]
   teachingGoal: string
-  renderer: RendererKind
-  visualKind: VisualKind
-  objects: SceneObject[]
-  actions: SceneAction[]
+  renderer: 'remotion'
+  visualKind: M3VisualKind
+  content: SceneContent
+  transition: SceneTransition
 }
 
 export interface RenderArtifact {
@@ -299,6 +417,10 @@ export interface VideoProjectManifest {
   narrationId?: string
   transcriptId?: string
   alignmentId?: string
+  storyboardId?: string
+  styleId?: string
+  sceneCount?: number
+  renderId?: string
 }
 
 export interface RendererAdapter {
