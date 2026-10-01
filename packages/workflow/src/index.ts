@@ -1,6 +1,7 @@
 import type {
   ProjectBrief,
   ResearchPack,
+  ScriptVersion,
   VideoProjectManifest,
   WorkflowStage,
 } from '@videooo/domain'
@@ -173,6 +174,119 @@ export function validateResearchPack(
   return issues
 }
 
+export function parseScriptVersion(
+  value: unknown,
+  project: VideoProjectManifest,
+  research: ResearchPack,
+  previous: ScriptVersion | null,
+): ScriptVersion {
+  const shapeIssues = validateScriptShape(value)
+  if (shapeIssues.length > 0) {
+    throw new ArtifactValidationError('Script Version', shapeIssues)
+  }
+
+  const script = value as ScriptVersion
+  const semanticIssues = validateScriptVersion(script, project, research, previous)
+  if (semanticIssues.length > 0) {
+    throw new ArtifactValidationError('Script Version', semanticIssues)
+  }
+
+  return script
+}
+
+export function validateScriptVersion(
+  script: ScriptVersion,
+  project: VideoProjectManifest,
+  research: ResearchPack,
+  previous: ScriptVersion | null,
+): string[] {
+  const issues: string[] = []
+
+  if (script.projectId !== project.id) {
+    issues.push(`projectId must be "${project.id}"`)
+  }
+  if (project.researchPackId === undefined) {
+    issues.push('project has no accepted Research Pack')
+  }
+  if (script.researchPackId !== research.id || script.researchPackId !== project.researchPackId) {
+    issues.push('researchPackId must match the current Research Pack')
+  }
+
+  if (previous === null) {
+    if (script.version !== 1) {
+      issues.push('first script version must be version 1')
+    }
+    if (script.parentVersionId !== undefined) {
+      issues.push('first script version must not have parentVersionId')
+    }
+  } else {
+    if (script.version !== previous.version + 1) {
+      issues.push(`version must be ${previous.version + 1}`)
+    }
+    if (script.parentVersionId !== previous.id) {
+      issues.push(`parentVersionId must be "${previous.id}"`)
+    }
+  }
+
+  const sectionIds = collectUniqueIds(script.sections, 'script section', issues)
+  void sectionIds
+  const claimIds = new Set(research.claims.map((claim) => claim.id))
+
+  for (const section of script.sections) {
+    addUnknownReferences(
+      section.researchClaimIds,
+      claimIds,
+      `section "${section.id}" claim`,
+      issues,
+    )
+  }
+
+  return issues
+}
+
+export function acceptScriptVersion(
+  project: VideoProjectManifest,
+  now = new Date().toISOString(),
+): VideoProjectManifest {
+  if (project.stage === 'draft-script') {
+    return transitionProject(project, 'script-review', now)
+  }
+  if (project.stage === 'script-review') {
+    return { ...project, updatedAt: now }
+  }
+  throw new Error(
+    `Script import requires stage "draft-script" or "script-review"; current stage is "${project.stage}"`,
+  )
+}
+
+export function approveScriptVersion(
+  project: VideoProjectManifest,
+  script: ScriptVersion,
+  now = new Date().toISOString(),
+): VideoProjectManifest {
+  if (project.stage !== 'script-review') {
+    throw new Error(
+      `Script approval requires stage "script-review"; current stage is "${project.stage}"`,
+    )
+  }
+  if (script.projectId !== project.id) {
+    throw new Error('Cannot approve a script from another project')
+  }
+  if (script.researchPackId !== project.researchPackId) {
+    throw new Error('Cannot approve a script from a different Research Pack')
+  }
+
+  return transitionProject(
+    {
+      ...project,
+      approvedScriptVersionId: script.id,
+      approvedScriptAt: now,
+    },
+    'approved',
+    now,
+  )
+}
+
 function validateResearchShape(value: unknown): string[] {
   const issues: string[] = []
   if (!isRecord(value)) {
@@ -268,6 +382,43 @@ function validateResearchShape(value: unknown): string[] {
       }
     },
   )
+
+  return issues
+}
+
+function validateScriptShape(value: unknown): string[] {
+  const issues: string[] = []
+  if (!isRecord(value)) {
+    return ['artifact must be a JSON object']
+  }
+
+  if (value.schemaVersion !== 1) issues.push('schemaVersion must be 1')
+  requireString(value.id, 'id', issues)
+  requireString(value.projectId, 'projectId', issues)
+  requireString(value.researchPackId, 'researchPackId', issues)
+  requireString(value.createdAt, 'createdAt', issues)
+
+  if (
+    typeof value.version !== 'number' ||
+    !Number.isInteger(value.version) ||
+    value.version < 1
+  ) {
+    issues.push('version must be a positive integer')
+  }
+  if (value.parentVersionId !== undefined) {
+    requireString(value.parentVersionId, 'parentVersionId', issues)
+  }
+  if (value.changeSummary !== undefined) {
+    requireString(value.changeSummary, 'changeSummary', issues)
+  }
+
+  validateObjectArray(value.sections, 'sections', issues, (item, path) => {
+    requireString(item.id, `${path}.id`, issues)
+    requireString(item.purpose, `${path}.purpose`, issues)
+    requireString(item.narration, `${path}.narration`, issues)
+    requireStringArray(item.researchClaimIds, `${path}.researchClaimIds`, issues)
+    requireStringArray(item.visualHints, `${path}.visualHints`, issues)
+  })
 
   return issues
 }

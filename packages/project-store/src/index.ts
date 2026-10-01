@@ -3,12 +3,17 @@ import {
   access,
   mkdir,
   readFile,
+  readdir,
   rename,
   rm,
   writeFile,
 } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
-import type { ResearchPack, VideoProjectManifest } from '@videooo/domain'
+import type {
+  ResearchPack,
+  ScriptVersion,
+  VideoProjectManifest,
+} from '@videooo/domain'
 
 export class ProjectStore {
   readonly directory: string
@@ -23,6 +28,17 @@ export class ProjectStore {
 
   get researchPath(): string {
     return resolve(this.directory, 'research.json')
+  }
+
+  get scriptsDirectory(): string {
+    return resolve(this.directory, 'scripts')
+  }
+
+  scriptPath(version: number): string {
+    if (!Number.isInteger(version) || version < 1) {
+      throw new Error('Script version must be a positive integer')
+    }
+    return resolve(this.scriptsDirectory, `v${String(version).padStart(3, '0')}.json`)
   }
 
   async initialize(project: VideoProjectManifest): Promise<void> {
@@ -56,6 +72,46 @@ export class ProjectStore {
     }
 
     await writeJsonAtomic(this.researchPath, pack)
+  }
+
+  async listScriptVersions(): Promise<number[]> {
+    if (!(await pathExists(this.scriptsDirectory))) {
+      return []
+    }
+
+    const versions: number[] = []
+    for (const entry of await readdir(this.scriptsDirectory, {
+      withFileTypes: true,
+    })) {
+      if (!entry.isFile()) continue
+      const match = /^v(\d+)\.json$/.exec(entry.name)
+      if (match === null) continue
+      const version = Number(match[1])
+      if (Number.isSafeInteger(version) && version > 0) {
+        versions.push(version)
+      }
+    }
+
+    return versions.sort((left, right) => left - right)
+  }
+
+  async loadScriptVersion(version: number): Promise<ScriptVersion> {
+    return readJson<ScriptVersion>(this.scriptPath(version))
+  }
+
+  async loadLatestScriptVersion(): Promise<ScriptVersion | null> {
+    const versions = await this.listScriptVersions()
+    const latest = versions.at(-1)
+    return latest === undefined ? null : this.loadScriptVersion(latest)
+  }
+
+  async appendScriptVersion(script: ScriptVersion): Promise<void> {
+    const path = this.scriptPath(script.version)
+    if (await pathExists(path)) {
+      throw new Error(`Script version ${script.version} already exists`)
+    }
+
+    await writeJsonAtomic(path, script)
   }
 }
 

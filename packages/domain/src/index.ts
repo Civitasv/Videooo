@@ -115,10 +115,14 @@ export interface ScriptSection {
 }
 
 export interface ScriptVersion {
+  schemaVersion: 1
   id: string
+  projectId: string
   version: number
-  status: 'draft' | 'approved'
+  parentVersionId?: string
+  researchPackId: string
   createdAt: string
+  changeSummary?: string
   sections: ScriptSection[]
 }
 
