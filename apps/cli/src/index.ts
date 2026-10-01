@@ -8,6 +8,7 @@ import { ManimWorker } from '@videooo/manim-worker'
 import {
   DEFAULT_VIDEO_STYLE,
   ProjectStore,
+  applyQaRepairOverlays,
   acceptAlignment,
   acceptNarration,
   acceptScriptVersion,
@@ -18,6 +19,7 @@ import {
   buildQaReport,
   compileStoryboard,
   createProject,
+  parseQaRepairOverlay,
   parseQaReviewArtifact,
   parseResearchPack,
   parseScriptVersion,
@@ -135,6 +137,7 @@ async function handleStatus(): Promise<void> {
         renderId: project.renderId ?? null,
         qaRunId: project.qaRunId ?? null,
         qaReportId: project.qaReportId ?? null,
+        qaRepairIds: project.qaRepairIds ?? [],
       },
       null,
       2,
@@ -565,7 +568,7 @@ async function handleRoute(args: string[]): Promise<void> {
   const store = new ProjectStore()
   console.log(
     JSON.stringify(
-      (await store.listScenes()).map((scene) => ({
+      (await loadEffectiveScenes(store)).map((scene) => ({
         id: scene.id,
         visualKind: scene.visualKind,
         renderer: scene.renderer,
@@ -593,7 +596,7 @@ async function handleManim(args: string[]): Promise<void> {
   const store = new ProjectStore()
   const storyboard = await store.loadStoryboard()
   const style = await store.loadStyle()
-  const scenes = await store.listScenes()
+  const scenes = await loadEffectiveScenes(store)
   const manimScenes = scenes.filter((scene) => scene.renderer === 'manim')
 
   if (action === 'render') {
@@ -678,7 +681,7 @@ async function handleRender(args: string[]): Promise<void> {
   const alignment = await store.loadAlignment()
   const narration = await store.loadNarration()
   const style = await store.loadStyle()
-  const scenes = await store.listScenes()
+  const scenes = await loadEffectiveScenes(store, project)
 
   if (storyboard.id !== project.storyboardId) {
     throw new Error('Storyboard artifact does not match project metadata')
@@ -732,9 +735,10 @@ async function handleRender(args: string[]): Promise<void> {
     manimSceneAssets,
   })
 
+  const repairRevision = project.qaRepairIds?.length ?? 0
   const manifest = {
     schemaVersion: 1 as const,
-    id: `render-${storyboard.id}`,
+    id: `render-${storyboard.id}-r${String(repairRevision).padStart(3, '0')}`,
     projectId: project.id,
     storyboardId: storyboard.id,
     alignmentId: alignment.id,
@@ -750,10 +754,10 @@ async function handleRender(args: string[]): Promise<void> {
   }
 
   await store.saveRenderManifest(manifest)
-  project = transitionProject(
-    { ...project, renderId: manifest.id },
-    'qa',
-  )
+  const renderedProject = { ...project, renderId: manifest.id }
+  delete renderedProject.qaRunId
+  delete renderedProject.qaReportId
+  project = transitionProject(renderedProject, 'qa')
   await store.saveProject(project)
 
   console.log(
@@ -785,7 +789,7 @@ async function handleQa(args: string[]): Promise<void> {
     const render = await store.loadRenderManifest()
     const alignment = await store.loadAlignment()
     const script = await store.loadScriptVersionById(approvedScriptVersionId)
-    const scenes = await store.listScenes()
+    const scenes = await loadEffectiveScenes(store, project)
     const sceneRenderIndex = await store.loadSceneRenderIndex()
     const manimAssetPaths = Object.fromEntries(
       sceneRenderIndex.assets.map((asset) => [
@@ -869,6 +873,43 @@ async function handleQa(args: string[]): Promise<void> {
     return
   }
 
+  if (action === 'repair') {
+    if (project.stage !== 'qa') {
+      throw new Error(
+        `QA repair requires stage "qa"; current stage is "${project.stage}"`,
+      )
+    }
+    if (argument !== 'import' || args[2] === undefined) {
+      throw new Error('Usage: videooo qa repair import <repair.json>')
+    }
+    const report = await store.loadQaReport(runId)
+    if (project.qaReportId !== report.id) {
+      throw new Error('Latest QA report does not match project metadata')
+    }
+    if (report.status !== 'fail') {
+      throw new Error('QA repair requires a failing report')
+    }
+
+    const effectiveScenes = await loadEffectiveScenes(store, project)
+    const overlay = parseQaRepairOverlay(
+      await readJsonFile(args[2]),
+      project,
+      report,
+      effectiveScenes,
+    )
+    await store.saveQaRepair(overlay)
+    const repairIds = [...(project.qaRepairIds ?? []), overlay.id]
+    project = transitionProject(
+      { ...project, qaRepairIds: repairIds },
+      'rendering',
+    )
+    await store.saveProject(project)
+    console.log(
+      `Imported QA repair "${overlay.id}" for ${overlay.sceneRepairs.length} scene(s). Project returned to rendering.`,
+    )
+    return
+  }
+
   if (action === 'accept') {
     if (project.stage !== 'qa') {
       throw new Error(
@@ -893,8 +934,18 @@ async function handleQa(args: string[]): Promise<void> {
   }
 
   throw new Error(
-    'Usage: videooo qa <prepare|evidence|import <review.json>|report|accept> [--ffmpeg <path>] [--ffprobe <path>]',
+    'Usage: videooo qa <prepare|evidence|import <review.json>|report|repair import <repair.json>|accept> [--ffmpeg <path>] [--ffprobe <path>]',
   )
+}
+
+async function loadEffectiveScenes(
+  store: ProjectStore,
+  project?: Awaited<ReturnType<ProjectStore['loadProject']>>,
+) {
+  const currentProject = project ?? (await store.loadProject())
+  const baseScenes = await store.listScenes()
+  const overlays = await store.loadQaRepairs(currentProject.qaRepairIds ?? [])
+  return applyQaRepairOverlays(baseScenes, overlays)
 }
 
 function resolveRenderOutputPath(
@@ -981,6 +1032,7 @@ Usage:
   videooo qa evidence
   videooo qa import <review.json>
   videooo qa report
+  videooo qa repair import <repair.json>
   videooo qa accept`)
 }
 
