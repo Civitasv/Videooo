@@ -1,0 +1,42 @@
+{
+  "name": "videooo",
+  "version": "0.1.0",
+  "description": "Research, write, direct, and produce human-narrated educational videos with Videooo.",
+  "author": {
+    "name": "Civitasv",
+    "url": "https://github.com/Civitasv"
+  },
+  "homepage": "https://github.com/Civitasv/Videooo",
+  "repository": "https://github.com/Civitasv/Videooo",
+  "license": "MIT",
+  "keywords": [
+    "video",
+    "education",
+    "research",
+    "remotion",
+    "manim",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Videooo",
+    "shortDescription": "AI-native educational video workflow",
+    "longDescription": "Turn a topic into sourced research, a collaboratively approved human narration script, and eventually synchronized educational visuals.",
+    "developerName": "Civitasv",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/Civitasv/Videooo",
+    "defaultPrompt": [
+      "Use Videooo to create an educational video about this topic.",
+      "Continue the Videooo project in this folder."
+    ]
+  },
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/videooo/SKILL.md"
+    }
+  }
+}

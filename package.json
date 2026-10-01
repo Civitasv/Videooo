@@ -13,9 +13,10 @@
     "clean": "tsc -b --clean",
     "typecheck": "tsc -b --pretty false",
     "lint": "oxlint packages apps scripts",
-    "test": "vitest run",
+    "test": "pnpm build && vitest run",
     "skills:check": "node scripts/validate-skills.mjs",
     "check": "pnpm skills:check && pnpm typecheck && pnpm lint && pnpm test",
+    "install:cli": "node scripts/install-cli.mjs",
     "videooo": "node apps/cli/.build/index.js"
   },
   "devDependencies": {

@@ -16,7 +16,9 @@ Do not remove the explicit human approval boundary between draft script and prod
 6. Store persisted time as integer milliseconds.
 7. Research claims must preserve source provenance.
 8. An approved script is immutable. Text revision creates a new version and returns to script review.
-9. Agent behavior belongs in `.agents/skills`; deterministic reusable behavior belongs in code.
-10. Tests and baseline CI must not require API keys or live model calls.
+9. Agent behavior belongs in root `skills/`; deterministic reusable behavior belongs in code.
+10. `skills/` is the single source of truth for packaged skills. Do not reintroduce `.agents/skills/`.
+11. Video project state belongs to the caller's current working directory under `.videooo/`, never the installed plugin directory.
+12. Tests and baseline CI must not require API keys or live model calls.
 
 Run `pnpm check` before opening a PR.

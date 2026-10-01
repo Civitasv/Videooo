@@ -21,7 +21,7 @@ Read:
 - `.videooo/research.json`;
 - the latest script version when revising.
 
-Do not invent factual claims that are unsupported by the current Research Pack.
+Do not invent factual claims unsupported by the current Research Pack.
 
 ## Writing rules
 
@@ -57,23 +57,9 @@ First draft:
 }
 ```
 
-A revision is a complete new version:
+A revision is a complete new version with `parentVersionId` and `changeSummary`.
 
-```json
-{
-  "schemaVersion": 1,
-  "id": "script-002",
-  "projectId": "<project id>",
-  "version": 2,
-  "parentVersionId": "script-001",
-  "researchPackId": "<research pack id>",
-  "createdAt": "<ISO-8601>",
-  "changeSummary": "Explain intuition before the formula.",
-  "sections": []
-}
-```
-
-Never overwrite an earlier version. Do not put mutable approval status inside a script artifact.
+Never overwrite an earlier version. Do not store mutable approval state in the script artifact.
 
 ## Draft/revision loop
 
@@ -81,19 +67,19 @@ Never overwrite an earlier version. Do not put mutable approval status inside a 
 2. Run `videooo script import <path>`.
 3. Show or summarize the version to the human.
 4. Discuss feedback.
-5. Create the next full version with `parentVersionId` and `changeSummary`.
+5. Create the next full version.
 6. Import it and repeat.
 
 Use `videooo script list` and `videooo script show [version]` to inspect history.
 
 ## Approval gate
 
-Never run the approval command merely because the agent thinks the script is ready.
+Never run approval merely because the agent thinks the script is ready.
 
-Only after the human explicitly approves a specific version, run:
+Only after explicit human approval, run:
 
 ```bash
 videooo script approve <version>
 ```
 
-Approval updates the project manifest to point at the immutable version. It does not mutate the script file.
+Approval updates the project manifest and does not mutate the script file.

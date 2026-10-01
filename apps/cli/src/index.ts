@@ -17,7 +17,15 @@ async function main(): Promise<void> {
 
   switch (command) {
     case undefined:
+    case '--help':
+    case '-h':
+    case 'help':
       printUsage()
+      return
+    case '--version':
+    case '-V':
+    case 'version':
+      console.log(await readCliVersion())
       return
     case 'init':
       await handleInit(args)
@@ -221,6 +229,17 @@ async function readJsonFile(path: string): Promise<unknown> {
   ) as unknown
 }
 
+async function readCliVersion(): Promise<string> {
+  const packageUrl = new URL('../package.json', import.meta.url)
+  const value = JSON.parse(await readFile(packageUrl, 'utf8')) as {
+    version?: unknown
+  }
+  if (typeof value.version !== 'string') {
+    throw new Error('Unable to read @videooo/cli version')
+  }
+  return value.version
+}
+
 function parseVersion(value: string): number {
   const version = Number(value)
   if (!Number.isSafeInteger(version) || version < 1) {
@@ -230,7 +249,11 @@ function parseVersion(value: string): number {
 }
 
 function printUsage(): void {
-  console.log(`Usage:
+  console.log(`Videooo — AI-native educational video workflow
+
+Usage:
+  videooo --version
+  videooo --help
   videooo init <topic>
   videooo status
   videooo research begin

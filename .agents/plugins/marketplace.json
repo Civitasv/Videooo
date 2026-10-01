@@ -1,0 +1,20 @@
+{
+  "name": "videooo-marketplace",
+  "interface": {
+    "displayName": "Videooo"
+  },
+  "plugins": [
+    {
+      "name": "videooo",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

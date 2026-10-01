@@ -69,4 +69,4 @@ Allowed claim `kind`: `fact`, `interpretation`, `contested`.
 
 Allowed visual `suggestedKind`: `diagram`, `equation`, `chart`, `concept-animation`, `code`, `comparison`.
 
-The deterministic validator in `@videooo/workflow` is authoritative.
+The deterministic validator in Videooo is authoritative.
