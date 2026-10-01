@@ -185,6 +185,7 @@ export class ProjectStore {
     const temporaryPath = `${targetPath}.${randomUUID()}.tmp`
     const sha256 = await sha256File(absoluteSource)
 
+    const mediaType = mediaTypeForExtension(extension)
     const asset: NarrationAsset = {
       schemaVersion: 1,
       id: `narration-${sha256.slice(0, 16)}`,
@@ -195,9 +196,7 @@ export class ProjectStore {
       storedFileName,
       sha256,
       byteLength: sourceStat.size,
-      ...(mediaTypeForExtension(extension) === undefined
-        ? {}
-        : { mediaType: mediaTypeForExtension(extension) }),
+      ...(mediaType === undefined ? {} : { mediaType }),
     }
 
     await mkdir(this.narrationDirectory, { recursive: true })
