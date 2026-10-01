@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { WhisperCppTranscriber } from '@videooo/transcriber-whisper-cpp'
 import {
+  DEFAULT_VIDEO_STYLE,
   ProjectStore,
   acceptAlignment,
   acceptNarration,
@@ -11,9 +12,11 @@ import {
   acceptTranscript,
   approveScriptVersion,
   buildNarrationAlignment,
+  compileStoryboard,
   createProject,
   parseResearchPack,
   parseScriptVersion,
+  parseStoryboardArtifact,
   parseTranscriptArtifact,
   transitionProject,
 } from '@videooo/core'
@@ -56,6 +59,12 @@ async function main(): Promise<void> {
       return
     case 'alignment':
       await handleAlignment(args)
+      return
+    case 'storyboard':
+      await handleStoryboard(args)
+      return
+    case 'scenes':
+      await handleScenes(args)
       return
     default:
       throw new Error(`Unknown command: ${command}`)
@@ -100,6 +109,10 @@ async function handleStatus(): Promise<void> {
         hasAlignment: alignment !== null,
         alignmentId: project.alignmentId ?? null,
         alignmentCoverage: alignment?.coverage ?? null,
+        hasStoryboard: await store.hasStoryboard(),
+        storyboardId: project.storyboardId ?? null,
+        styleId: project.styleId ?? null,
+        sceneCount: project.sceneCount ?? 0,
       },
       null,
       2,
@@ -421,6 +434,106 @@ async function handleAlignment(args: string[]): Promise<void> {
   console.log(JSON.stringify(await store.loadAlignment(), null, 2))
 }
 
+async function handleStoryboard(args: string[]): Promise<void> {
+  const [action, argument] = args
+  const store = new ProjectStore()
+  const project = await store.loadProject()
+
+  switch (action) {
+    case 'import': {
+      if (argument === undefined) {
+        throw new Error('Usage: videooo storyboard import <storyboard.json>')
+      }
+      if (project.stage !== 'aligned') {
+        throw new Error(
+          `Storyboard import requires stage "aligned"; current stage is "${project.stage}"`,
+        )
+      }
+      const alignment = await store.loadAlignment()
+      const storyboard = parseStoryboardArtifact(
+        await readJsonFile(argument),
+        project,
+        alignment,
+      )
+      await store.saveStoryboard(storyboard)
+      console.log(`Imported storyboard "${storyboard.id}" with ${storyboard.scenes.length} scene(s).`)
+      return
+    }
+
+    case 'show':
+      console.log(JSON.stringify(await store.loadStoryboard(), null, 2))
+      return
+
+    case 'compile': {
+      if (project.stage !== 'aligned') {
+        throw new Error(
+          `Storyboard compile requires stage "aligned"; current stage is "${project.stage}"`,
+        )
+      }
+      const alignment = await store.loadAlignment()
+      const storyboard = parseStoryboardArtifact(
+        await store.loadStoryboard(),
+        project,
+        alignment,
+      )
+      const scenes = compileStoryboard(storyboard)
+      if (!(await store.hasStyle())) {
+        await store.saveStyle(DEFAULT_VIDEO_STYLE)
+      }
+      await store.saveScenes(scenes)
+      const next = transitionProject(
+        {
+          ...project,
+          storyboardId: storyboard.id,
+          styleId: DEFAULT_VIDEO_STYLE.id,
+          sceneCount: scenes.length,
+        },
+        'storyboarded',
+      )
+      await store.saveProject(next)
+      console.log(`Compiled ${scenes.length} scene(s) from storyboard "${storyboard.id}".`)
+      return
+    }
+
+    default:
+      throw new Error(
+        'Usage: videooo storyboard <import <storyboard.json>|show|compile>',
+      )
+  }
+}
+
+async function handleScenes(args: string[]): Promise<void> {
+  const [action, argument] = args
+  const store = new ProjectStore()
+
+  if (action === 'list') {
+    console.log(
+      JSON.stringify(
+        (await store.listScenes()).map((scene) => ({
+          id: scene.id,
+          startMs: scene.startMs,
+          durationMs: scene.durationMs,
+          visualKind: scene.visualKind,
+          teachingGoal: scene.teachingGoal,
+        })),
+        null,
+        2,
+      ),
+    )
+    return
+  }
+
+  if (action === 'show') {
+    if (argument === undefined) {
+      throw new Error('Usage: videooo scenes show <scene-id>')
+    }
+    console.log(JSON.stringify(await store.loadScene(argument), null, 2))
+    return
+  }
+
+  throw new Error('Usage: videooo scenes <list|show <scene-id>>')
+}
+
 async function readJsonFile(path: string): Promise<unknown> {
   return JSON.parse(
     await readFile(resolve(process.cwd(), path), 'utf8'),
@@ -480,7 +593,12 @@ Usage:
   videooo transcript show
   videooo align --from-transcript [--accept-low-coverage]
   videooo align --provider whisper-cpp [--model <path>] [--language <code>] [--binary <path>] [--ffmpeg <path>] [--accept-low-coverage]
-  videooo alignment show`)
+  videooo alignment show
+  videooo storyboard import <storyboard.json>
+  videooo storyboard show
+  videooo storyboard compile
+  videooo scenes list
+  videooo scenes show <scene-id>`)
 }
 
 try {
