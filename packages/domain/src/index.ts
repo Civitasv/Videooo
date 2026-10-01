@@ -231,6 +231,25 @@ export interface NarrationAlignment {
   sections: AlignedSection[]
 }
 
+export interface EstimatedSectionTiming {
+  sectionId: string
+  startMs: number
+  endMs: number
+  durationMs: number
+}
+
+export interface EstimatedTiming {
+  schemaVersion: 1
+  id: string
+  projectId: string
+  scriptVersionId: string
+  createdAt: string
+  method: 'heuristic'
+  durationMs: number
+  targetDurationMs?: number
+  sections: EstimatedSectionTiming[]
+}
+
 export type M3VisualKind =
   | 'title'
   | 'typography'
@@ -386,6 +405,16 @@ export interface StoryboardArtifact {
   scenes: StoryboardScene[]
 }
 
+export interface PrevisStoryboardArtifact {
+  schemaVersion: 1
+  id: string
+  projectId: string
+  timingId: string
+  createdAt: string
+  video: VideoFormat
+  scenes: StoryboardScene[]
+}
+
 export interface VideoStyle {
   schemaVersion: 1
   id: string
@@ -474,6 +503,22 @@ export interface VideoRenderManifest {
   projectId: string
   storyboardId: string
   alignmentId: string
+  createdAt: string
+  renderer: 'remotion'
+  outputPath: string
+  width: number
+  height: number
+  fps: number
+  durationMs: number
+  codec: 'h264'
+}
+
+export interface PrevisRenderManifest {
+  schemaVersion: 1
+  id: string
+  projectId: string
+  storyboardId: string
+  timingId: string
   createdAt: string
   renderer: 'remotion'
   outputPath: string
@@ -594,6 +639,9 @@ export interface VideoProjectManifest {
   qaRunId?: string
   qaReportId?: string
   qaRepairIds?: string[]
+  previsTimingId?: string
+  previsStoryboardId?: string
+  previsRenderId?: string
 }
 
 export interface RendererAdapter {
