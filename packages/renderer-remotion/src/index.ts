@@ -1,5 +1,5 @@
 import { copyFile, mkdir, rm, stat } from 'node:fs/promises'
-import { extname, resolve } from 'node:path'
+import { dirname, extname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { bundle } from '@remotion/bundler'
 import { renderMedia, selectComposition } from '@remotion/renderer'
@@ -70,14 +70,7 @@ export async function renderRemotionVideo(
   }
 
   const outputLocation = resolve(input.outputLocation)
-  await mkdir(resolve(outputLocation, '..'), { recursive: true }).catch(
-    async () => {
-      const separator = outputLocation.lastIndexOf('/')
-      if (separator > 0) {
-        await mkdir(outputLocation.slice(0, separator), { recursive: true })
-      }
-    },
-  )
+  await mkdir(dirname(outputLocation), { recursive: true })
 
   const entryPoint = fileURLToPath(
     new URL('./remotion-entry.js', import.meta.url),
