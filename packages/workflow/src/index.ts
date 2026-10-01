@@ -45,7 +45,7 @@ export function createProject(
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 48)
-  const id = options.id ?? slug || 'video'
+  const id = options.id ?? (slug || 'video')
 
   return {
     schemaVersion: 1,
