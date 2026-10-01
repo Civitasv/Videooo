@@ -794,6 +794,8 @@ async function handleQa(args: string[]): Promise<void> {
       ]),
     )
     const runId = await store.nextQaRunId()
+    const ffmpegBinary = optionValue(args, '--ffmpeg')
+    const ffprobeBinary = optionValue(args, '--ffprobe')
     const evidence = await prepareQaEvidence({
       project,
       render,
@@ -806,12 +808,8 @@ async function handleQa(args: string[]): Promise<void> {
       videoPathLabel: render.outputPath,
       framesDirectory: store.qaFramesDirectory(runId),
       evidenceId: runId,
-      ...(optionValue(args, '--ffmpeg') === undefined
-        ? {}
-        : { ffmpegBinary: optionValue(args, '--ffmpeg') }),
-      ...(optionValue(args, '--ffprobe') === undefined
-        ? {}
-        : { ffprobeBinary: optionValue(args, '--ffprobe') }),
+      ...(ffmpegBinary === undefined ? {} : { ffmpegBinary }),
+      ...(ffprobeBinary === undefined ? {} : { ffprobeBinary }),
     })
 
     await store.saveQaEvidence(evidence)
