@@ -5,6 +5,9 @@
     "outDir": ".build",
     "tsBuildInfoFile": ".build/.tsbuildinfo"
   },
-  "references": [{ "path": "../domain" }],
+  "references": [
+    { "path": "../domain" },
+    { "path": "../visual-router" }
+  ],
   "include": ["src/**/*.ts"]
 }
