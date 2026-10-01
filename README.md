@@ -217,6 +217,10 @@ videooo qa evidence
 videooo qa import review.json
 videooo qa report
 
+# when a structural blocker requires a fresh render:
+videooo qa rerender
+videooo render
+
 # when blocking visual findings exist:
 videooo qa repair import repair.json
 videooo render
