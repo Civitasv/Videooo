@@ -6,6 +6,7 @@
     "tsBuildInfoFile": ".build/.tsbuildinfo"
   },
   "references": [
+    { "path": "../alignment" },
     { "path": "../domain" },
     { "path": "../project-store" },
     { "path": "../workflow" }
