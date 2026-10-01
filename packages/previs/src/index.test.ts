@@ -59,7 +59,7 @@ describe('Previs storyboard', () => {
   it('fails promotion when real section timing is unavailable', () => {
     const timing = estimateScriptTiming(project(), script(), { id: 'timing' })
     const real = alignment()
-    real.sections[1]!.startMs = undefined
+    delete real.sections[1]!.startMs
 
     expect(() =>
       promotePrevisStoryboard(storyboard(timing.durationMs), timing, real),
