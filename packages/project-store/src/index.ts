@@ -21,6 +21,7 @@ import type {
   StoryboardArtifact,
   TranscriptArtifact,
   VideoProjectManifest,
+  VideoRenderManifest,
   VideoStyle,
 } from '@videooo/domain'
 
@@ -79,6 +80,22 @@ export class ProjectStore {
 
   get scenesDirectory(): string {
     return resolve(this.directory, 'scenes')
+  }
+
+  get rendersDirectory(): string {
+    return resolve(this.directory, 'renders')
+  }
+
+  get draftRenderPath(): string {
+    return resolve(this.rendersDirectory, 'draft.mp4')
+  }
+
+  get renderManifestPath(): string {
+    return resolve(this.rendersDirectory, 'render.json')
+  }
+
+  get renderWorkspaceDirectory(): string {
+    return resolve(this.directory, 'render-workspace')
   }
 
   scenePath(index: number): string {
@@ -325,6 +342,18 @@ export class ProjectStore {
       if (scene.id === id) return scene
     }
     throw new Error(`Scene "${id}" does not exist`)
+  }
+
+  async saveRenderManifest(manifest: VideoRenderManifest): Promise<void> {
+    await writeJsonAtomic(this.renderManifestPath, manifest)
+  }
+
+  async loadRenderManifest(): Promise<VideoRenderManifest> {
+    return readJson<VideoRenderManifest>(this.renderManifestPath)
+  }
+
+  async hasRenderManifest(): Promise<boolean> {
+    return pathExists(this.renderManifestPath)
   }
 }
 

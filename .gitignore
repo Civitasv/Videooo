@@ -10,3 +10,4 @@ coverage/
 .videooo/cache/
 .videooo/renders/
 .videooo/tmp/
+.videooo/render-workspace/

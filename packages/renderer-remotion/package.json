@@ -3,9 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./.build/index.js",
   "types": "./src/index.ts",
   "dependencies": {
-    "@videooo/domain": "workspace:*"
+    "@remotion/bundler": "4.0.532",
+    "@remotion/media": "4.0.532",
+    "@remotion/renderer": "4.0.532",
+    "@videooo/domain": "workspace:*",
+    "@videooo/storyboard": "workspace:*",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.532"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
   }
 }

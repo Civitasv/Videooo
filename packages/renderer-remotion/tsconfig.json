@@ -3,8 +3,13 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": ".build",
-    "tsBuildInfoFile": ".build/.tsbuildinfo"
+    "tsBuildInfoFile": ".build/.tsbuildinfo",
+    "jsx": "react-jsx",
+    "types": ["node", "react", "react-dom"]
   },
-  "references": [{ "path": "../domain" }],
-  "include": ["src/**/*.ts"]
+  "references": [
+    { "path": "../domain" },
+    { "path": "../storyboard" }
+  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

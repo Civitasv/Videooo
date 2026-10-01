@@ -104,9 +104,23 @@ Report duration, coverage, significant deviations, and section timing. Then use 
 
 ### storyboarded
 
-The Scene IR is compiled. Use the implemented renderer capability when available. Do not generate a separate per-project React application.
+The Scene IR is compiled. Render with the shared installed runtime:
 
-### rendering / qa / done
+```bash
+videooo render
+```
+
+Do not generate a separate per-project React application.
+
+### rendering
+
+A previous render started but did not reach QA. Inspect the error and rerun `videooo render` after fixing the prerequisite or renderer issue.
+
+### qa
+
+A draft MP4 exists. Report the output from `videooo status` / project render metadata. Automated visual QA and scene regeneration belong to M5; do not pretend they have run.
+
+### done
 
 Follow the implemented capabilities available in the current Videooo version. Never fabricate missing milestone behavior.
 
