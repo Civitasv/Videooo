@@ -238,6 +238,13 @@ export type M3VisualKind =
   | 'diagram'
   | 'summary'
 
+export type M4VisualKind =
+  | M3VisualKind
+  | 'equation'
+  | 'plot'
+  | 'vector'
+  | 'algorithm'
+
 export type SceneTransition = 'cut' | 'fade' | 'slide'
 
 export interface TitleSceneContent {
@@ -290,12 +297,66 @@ export interface SummarySceneContent {
   bullets: string[]
 }
 
+export interface EquationSceneContent {
+  type: 'equation'
+  title?: string
+  steps: string[]
+  annotations?: string[]
+}
+
+export interface PlotSeries {
+  id: string
+  label?: string
+  points: Array<[number, number]>
+}
+
+export interface PlotSceneContent {
+  type: 'plot'
+  title?: string
+  xLabel?: string
+  yLabel?: string
+  xRange: [number, number]
+  yRange: [number, number]
+  series: PlotSeries[]
+}
+
+export interface VectorItem {
+  id: string
+  label?: string
+  from: [number, number]
+  to: [number, number]
+}
+
+export interface VectorSceneContent {
+  type: 'vector'
+  title?: string
+  vectors: VectorItem[]
+  xRange?: [number, number]
+  yRange?: [number, number]
+}
+
+export interface AlgorithmState {
+  label: string
+  values: string[]
+  activeIndices?: number[]
+}
+
+export interface AlgorithmSceneContent {
+  type: 'algorithm'
+  title?: string
+  states: AlgorithmState[]
+}
+
 export type SceneContent =
   | TitleSceneContent
   | TypographySceneContent
   | CodeSceneContent
   | DiagramSceneContent
   | SummarySceneContent
+  | EquationSceneContent
+  | PlotSceneContent
+  | VectorSceneContent
+  | AlgorithmSceneContent
 
 export interface VideoFormat {
   width: number
@@ -309,7 +370,7 @@ export interface StoryboardScene {
   endMs: number
   sectionIds: string[]
   teachingGoal: string
-  visualKind: M3VisualKind
+  visualKind: M4VisualKind
   direction: string
   content: SceneContent
   transition?: SceneTransition
@@ -382,10 +443,28 @@ export interface SceneIR {
   durationMs: number
   sectionIds: string[]
   teachingGoal: string
-  renderer: 'remotion'
-  visualKind: M3VisualKind
+  renderer: RendererKind
+  visualKind: M4VisualKind
   content: SceneContent
   transition: SceneTransition
+}
+
+export interface SceneRenderAsset {
+  schemaVersion: 1
+  sceneId: string
+  renderer: 'manim'
+  fileName: string
+  cacheKey: string
+  manimVersion: string
+  durationMs: number
+  width: number
+  height: number
+  fps: number
+}
+
+export interface SceneRenderIndex {
+  schemaVersion: 1
+  assets: SceneRenderAsset[]
 }
 
 export interface VideoRenderManifest {
