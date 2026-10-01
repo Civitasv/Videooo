@@ -43,7 +43,7 @@ export function parseTranscriptArtifact(
 ): TranscriptArtifact {
   const issues = validateTranscriptShape(value)
   if (issues.length > 0) {
-    throw new ArtifactValidationError('Transcript Artifact', issues)
+    throw validationError('Transcript Artifact', issues)
   }
 
   const transcript = value as TranscriptArtifact
@@ -53,7 +53,7 @@ export function parseTranscriptArtifact(
     narration,
   )
   if (semanticIssues.length > 0) {
-    throw new ArtifactValidationError('Transcript Artifact', semanticIssues)
+    throw validationError('Transcript Artifact', semanticIssues)
   }
 
   return transcript
@@ -283,4 +283,8 @@ function requireFiniteNumber(
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     issues.push(`${path} must be a finite number`)
   }
+}
+
+function validationError(artifact: string, issues: readonly string[]): Error {
+  return new Error(`Invalid ${artifact}:\n- ${issues.join('\n- ')}`)
 }
