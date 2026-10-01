@@ -1,4 +1,9 @@
-import type { VideoProjectManifest, WorkflowStage } from '@videooo/domain'
+import type {
+  ProjectBrief,
+  ResearchPack,
+  VideoProjectManifest,
+  WorkflowStage,
+} from '@videooo/domain'
 
 const transitions: Readonly<Record<WorkflowStage, readonly WorkflowStage[]>> = {
   topic: ['research'],
@@ -12,6 +17,16 @@ const transitions: Readonly<Record<WorkflowStage, readonly WorkflowStage[]>> = {
   rendering: ['qa'],
   qa: ['rendering', 'done'],
   done: ['draft-script'],
+}
+
+export class ArtifactValidationError extends Error {
+  readonly issues: readonly string[]
+
+  constructor(artifact: string, issues: readonly string[]) {
+    super(`Invalid ${artifact}:\n- ${issues.join('\n- ')}`)
+    this.name = 'ArtifactValidationError'
+    this.issues = issues
+  }
 }
 
 export function canTransition(from: WorkflowStage, to: WorkflowStage): boolean {
@@ -32,7 +47,7 @@ export function transitionProject(
 
 export function createProject(
   topic: string,
-  options: { id?: string; now?: string } = {},
+  options: { id?: string; now?: string; brief?: ProjectBrief } = {},
 ): VideoProjectManifest {
   const normalizedTopic = topic.trim()
   if (normalizedTopic.length === 0) {
@@ -54,5 +69,274 @@ export function createProject(
     stage: 'topic',
     createdAt: now,
     updatedAt: now,
+    ...(options.brief === undefined ? {} : { brief: options.brief }),
+  }
+}
+
+export function parseResearchPack(
+  value: unknown,
+  project: VideoProjectManifest,
+): ResearchPack {
+  const shapeIssues = validateResearchShape(value)
+  if (shapeIssues.length > 0) {
+    throw new ArtifactValidationError('Research Pack', shapeIssues)
+  }
+
+  const pack = value as ResearchPack
+  const semanticIssues = validateResearchPack(pack, project)
+  if (semanticIssues.length > 0) {
+    throw new ArtifactValidationError('Research Pack', semanticIssues)
+  }
+
+  return pack
+}
+
+export function validateResearchPack(
+  pack: ResearchPack,
+  project: VideoProjectManifest,
+): string[] {
+  const issues: string[] = []
+
+  if (pack.projectId !== project.id) {
+    issues.push(`projectId must be "${project.id}"`)
+  }
+  if (pack.topic.trim() !== project.topic.trim()) {
+    issues.push('topic must match the project topic')
+  }
+
+  const sourceIds = collectUniqueIds(pack.sources, 'source', issues)
+  const claimIds = collectUniqueIds(pack.claims, 'claim', issues)
+  collectUniqueIds(pack.definitions, 'definition', issues)
+  collectUniqueIds(pack.examples, 'example', issues)
+  collectUniqueIds(pack.misconceptions, 'misconception', issues)
+  collectUniqueIds(pack.visualOpportunities, 'visual opportunity', issues)
+
+  for (const source of pack.sources) {
+    try {
+      const url = new URL(source.url)
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        issues.push(`source "${source.id}" URL must use http or https`)
+      }
+    } catch {
+      issues.push(`source "${source.id}" has an invalid URL`)
+    }
+  }
+
+  for (const claim of pack.claims) {
+    if (claim.kind === 'fact' && claim.sourceIds.length === 0) {
+      issues.push(`fact claim "${claim.id}" requires at least one source`)
+    }
+    addUnknownReferences(
+      claim.sourceIds,
+      sourceIds,
+      `claim "${claim.id}" source`,
+      issues,
+    )
+  }
+
+  for (const definition of pack.definitions) {
+    addUnknownReferences(
+      definition.sourceIds,
+      sourceIds,
+      `definition "${definition.id}" source`,
+      issues,
+    )
+  }
+
+  for (const example of pack.examples) {
+    addUnknownReferences(
+      example.relatedClaimIds,
+      claimIds,
+      `example "${example.id}" claim`,
+      issues,
+    )
+  }
+
+  for (const misconception of pack.misconceptions) {
+    addUnknownReferences(
+      misconception.relatedClaimIds,
+      claimIds,
+      `misconception "${misconception.id}" claim`,
+      issues,
+    )
+  }
+
+  for (const opportunity of pack.visualOpportunities) {
+    addUnknownReferences(
+      opportunity.relatedClaimIds,
+      claimIds,
+      `visual opportunity "${opportunity.id}" claim`,
+      issues,
+    )
+  }
+
+  return issues
+}
+
+function validateResearchShape(value: unknown): string[] {
+  const issues: string[] = []
+  if (!isRecord(value)) {
+    return ['artifact must be a JSON object']
+  }
+
+  if (value.schemaVersion !== 1) issues.push('schemaVersion must be 1')
+  requireString(value.id, 'id', issues)
+  requireString(value.projectId, 'projectId', issues)
+  requireString(value.topic, 'topic', issues)
+  requireString(value.createdAt, 'createdAt', issues)
+  requireStringArray(value.questions, 'questions', issues)
+  requireStringArray(value.unresolved, 'unresolved', issues)
+
+  validateObjectArray(value.sources, 'sources', issues, (item, path) => {
+    requireString(item.id, `${path}.id`, issues)
+    requireString(item.title, `${path}.title`, issues)
+    requireString(item.url, `${path}.url`, issues)
+    requireString(item.accessedAt, `${path}.accessedAt`, issues)
+    if (
+      item.sourceType !== 'primary' &&
+      item.sourceType !== 'secondary' &&
+      item.sourceType !== 'community' &&
+      item.sourceType !== 'other'
+    ) {
+      issues.push(`${path}.sourceType is invalid`)
+    }
+  })
+
+  validateObjectArray(value.claims, 'claims', issues, (item, path) => {
+    requireString(item.id, `${path}.id`, issues)
+    requireString(item.text, `${path}.text`, issues)
+    requireStringArray(item.sourceIds, `${path}.sourceIds`, issues)
+    if (
+      item.confidence !== 'high' &&
+      item.confidence !== 'medium' &&
+      item.confidence !== 'low'
+    ) {
+      issues.push(`${path}.confidence is invalid`)
+    }
+    if (
+      item.kind !== 'fact' &&
+      item.kind !== 'interpretation' &&
+      item.kind !== 'contested'
+    ) {
+      issues.push(`${path}.kind is invalid`)
+    }
+  })
+
+  validateObjectArray(value.definitions, 'definitions', issues, (item, path) => {
+    requireString(item.id, `${path}.id`, issues)
+    requireString(item.term, `${path}.term`, issues)
+    requireString(item.definition, `${path}.definition`, issues)
+    requireStringArray(item.sourceIds, `${path}.sourceIds`, issues)
+  })
+
+  validateObjectArray(value.examples, 'examples', issues, (item, path) => {
+    requireString(item.id, `${path}.id`, issues)
+    requireString(item.description, `${path}.description`, issues)
+    requireStringArray(item.relatedClaimIds, `${path}.relatedClaimIds`, issues)
+  })
+
+  validateObjectArray(
+    value.misconceptions,
+    'misconceptions',
+    issues,
+    (item, path) => {
+      requireString(item.id, `${path}.id`, issues)
+      requireString(item.misconception, `${path}.misconception`, issues)
+      requireString(item.correction, `${path}.correction`, issues)
+      requireStringArray(item.relatedClaimIds, `${path}.relatedClaimIds`, issues)
+    },
+  )
+
+  validateObjectArray(
+    value.visualOpportunities,
+    'visualOpportunities',
+    issues,
+    (item, path) => {
+      requireString(item.id, `${path}.id`, issues)
+      requireString(item.description, `${path}.description`, issues)
+      requireStringArray(item.relatedClaimIds, `${path}.relatedClaimIds`, issues)
+      if (
+        item.suggestedKind !== undefined &&
+        item.suggestedKind !== 'diagram' &&
+        item.suggestedKind !== 'equation' &&
+        item.suggestedKind !== 'chart' &&
+        item.suggestedKind !== 'concept-animation' &&
+        item.suggestedKind !== 'code' &&
+        item.suggestedKind !== 'comparison'
+      ) {
+        issues.push(`${path}.suggestedKind is invalid`)
+      }
+    },
+  )
+
+  return issues
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function requireString(value: unknown, path: string, issues: string[]): void {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    issues.push(`${path} must be a non-empty string`)
+  }
+}
+
+function requireStringArray(value: unknown, path: string, issues: string[]): void {
+  if (!Array.isArray(value)) {
+    issues.push(`${path} must be an array`)
+    return
+  }
+
+  for (const [index, item] of value.entries()) {
+    requireString(item, `${path}[${index}]`, issues)
+  }
+}
+
+function validateObjectArray(
+  value: unknown,
+  path: string,
+  issues: string[],
+  validate: (item: Record<string, unknown>, path: string) => void,
+): void {
+  if (!Array.isArray(value)) {
+    issues.push(`${path} must be an array`)
+    return
+  }
+
+  for (const [index, item] of value.entries()) {
+    if (!isRecord(item)) {
+      issues.push(`${path}[${index}] must be an object`)
+      continue
+    }
+    validate(item, `${path}[${index}]`)
+  }
+}
+
+function collectUniqueIds(
+  values: readonly { id: string }[],
+  kind: string,
+  issues: string[],
+): Set<string> {
+  const ids = new Set<string>()
+  for (const value of values) {
+    if (ids.has(value.id)) {
+      issues.push(`duplicate ${kind} id "${value.id}"`)
+    }
+    ids.add(value.id)
+  }
+  return ids
+}
+
+function addUnknownReferences(
+  references: readonly string[],
+  known: ReadonlySet<string>,
+  label: string,
+  issues: string[],
+): void {
+  for (const reference of references) {
+    if (!known.has(reference)) {
+      issues.push(`${label} references unknown id "${reference}"`)
+    }
   }
 }
