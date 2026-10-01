@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { WhisperCppTranscriber } from '@videooo/transcriber-whisper-cpp'
 import { renderRemotionVideo } from '@videooo/renderer-remotion'
+import { ManimWorker } from '@videooo/manim-worker'
 import {
   DEFAULT_VIDEO_STYLE,
   ProjectStore,
@@ -66,6 +67,12 @@ async function main(): Promise<void> {
       return
     case 'scenes':
       await handleScenes(args)
+      return
+    case 'route':
+      await handleRoute(args)
+      return
+    case 'manim':
+      await handleManim(args)
       return
     case 'render':
       await handleRender(args)
@@ -540,6 +547,107 @@ async function handleScenes(args: string[]): Promise<void> {
   throw new Error('Usage: videooo scenes <list|show <scene-id>>')
 }
 
+async function handleRoute(args: string[]): Promise<void> {
+  const [action] = args
+  if (action !== 'show') {
+    throw new Error('Usage: videooo route show')
+  }
+
+  const store = new ProjectStore()
+  console.log(
+    JSON.stringify(
+      (await store.listScenes()).map((scene) => ({
+        id: scene.id,
+        visualKind: scene.visualKind,
+        renderer: scene.renderer,
+      })),
+      null,
+      2,
+    ),
+  )
+}
+
+async function handleManim(args: string[]): Promise<void> {
+  const [action, sceneId] = args
+  const binary = optionValue(args, '--manim-bin')
+  const ffprobeBinary = optionValue(args, '--ffprobe')
+  const worker = new ManimWorker({
+    ...(binary === undefined ? {} : { binary }),
+    ...(ffprobeBinary === undefined ? {} : { ffprobeBinary }),
+  })
+
+  if (action === 'check') {
+    console.log(JSON.stringify(worker.check(), null, 2))
+    return
+  }
+
+  const store = new ProjectStore()
+  const storyboard = await store.loadStoryboard()
+  const style = await store.loadStyle()
+  const scenes = await store.listScenes()
+  const manimScenes = scenes.filter((scene) => scene.renderer === 'manim')
+
+  if (action === 'render') {
+    if (sceneId === undefined || sceneId.startsWith('--')) {
+      throw new Error(
+        'Usage: videooo manim render <scene-id> [--manim-bin <path>]',
+      )
+    }
+    const scene = manimScenes.find((candidate) => candidate.id === sceneId)
+    if (scene === undefined) {
+      throw new Error(`Manim scene "${sceneId}" does not exist`)
+    }
+    const asset = await renderOneManimScene(
+      worker,
+      store,
+      scene,
+      storyboard.video,
+      style,
+    )
+    console.log(JSON.stringify(asset, null, 2))
+    return
+  }
+
+  if (action === 'render-all') {
+    let count = 0
+    for (const scene of manimScenes) {
+      await renderOneManimScene(
+        worker,
+        store,
+        scene,
+        storyboard.video,
+        style,
+      )
+      count += 1
+    }
+    console.log(`Rendered or reused ${count} Manim scene asset(s).`)
+    return
+  }
+
+  throw new Error(
+    'Usage: videooo manim <check|render <scene-id>|render-all> [--manim-bin <path>]',
+  )
+}
+
+async function renderOneManimScene(
+  worker: ManimWorker,
+  store: ProjectStore,
+  scene: Awaited<ReturnType<ProjectStore['listScenes']>>[number],
+  video: Awaited<ReturnType<ProjectStore['loadStoryboard']>>['video'],
+  style: Awaited<ReturnType<ProjectStore['loadStyle']>>,
+) {
+  const asset = await worker.render({
+    scene,
+    style,
+    video,
+    generatedDirectory: store.manimGeneratedDirectory,
+    mediaDirectory: store.manimMediaDirectory,
+    outputDirectory: store.sceneRendersDirectory,
+  })
+  await store.saveSceneRenderAsset(asset)
+  return asset
+}
+
 async function handleRender(args: string[]): Promise<void> {
   const store = new ProjectStore()
   let project = await store.loadProject()
@@ -683,6 +791,10 @@ Usage:
   videooo storyboard compile
   videooo scenes list
   videooo scenes show <scene-id>
+  videooo route show
+  videooo manim check [--manim-bin <path>]
+  videooo manim render <scene-id> [--manim-bin <path>]
+  videooo manim render-all [--manim-bin <path>]
   videooo render [--output <file>]`)
 }
 

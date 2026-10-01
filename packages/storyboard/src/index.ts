@@ -7,6 +7,7 @@ import type {
   VideoProjectManifest,
   VideoStyle,
 } from '@videooo/domain'
+import { routeVisualKind, validateM4SceneContent } from '@videooo/visual-router'
 
 export const DEFAULT_VIDEO_STYLE: VideoStyle = {
   schemaVersion: 1,
@@ -117,7 +118,7 @@ export function compileStoryboard(
     durationMs: scene.endMs - scene.startMs,
     sectionIds: [...scene.sectionIds],
     teachingGoal: scene.teachingGoal,
-    renderer: 'remotion',
+    renderer: routeVisualKind(scene.visualKind),
     visualKind: scene.visualKind,
     content: structuredClone(scene.content),
     transition: scene.transition ?? 'fade',
@@ -192,9 +193,9 @@ function validateScene(
     }
   }
 
-  const allowed = new Set(['title', 'typography', 'code', 'diagram', 'summary'])
+  const allowed = new Set(['title', 'typography', 'code', 'diagram', 'summary', 'equation', 'plot', 'vector', 'algorithm'])
   if (!allowed.has(scene.visualKind)) {
-    issues.push(`scene "${label}" visualKind is unsupported in M3`)
+    issues.push(`scene "${label}" visualKind is unsupported in M4`)
   }
   if (
     scene.transition !== undefined &&
@@ -298,6 +299,16 @@ function validateContent(
       ) {
         issues.push(`scene "${label}" summary bullets must be non-empty`)
       }
+      break
+    case 'equation':
+    case 'plot':
+    case 'vector':
+    case 'algorithm':
+      issues.push(
+        ...validateM4SceneContent(scene.visualKind, content).map(
+          (issue) => `scene "${label}" ${issue}`,
+        ),
+      )
       break
     default:
       issues.push(`scene "${label}" content type is unsupported`)

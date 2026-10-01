@@ -3,11 +3,9 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": ".build",
-    "tsBuildInfoFile": ".build/.tsbuildinfo"
+    "tsBuildInfoFile": ".build/.tsbuildinfo",
+    "types": ["node"]
   },
-  "references": [
-    { "path": "../domain" },
-    { "path": "../visual-router" }
-  ],
+  "references": [{ "path": "../domain" }],
   "include": ["src/**/*.ts"]
 }

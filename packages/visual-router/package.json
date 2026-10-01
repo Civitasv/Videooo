@@ -1,12 +1,11 @@
 {
-  "name": "@videooo/storyboard",
+  "name": "@videooo/visual-router",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "dependencies": {
-    "@videooo/domain": "workspace:*",
-    "@videooo/visual-router": "workspace:*"
+    "@videooo/domain": "workspace:*"
   }
 }
