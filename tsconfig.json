@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/domain" },
+    { "path": "./packages/project-store" },
     { "path": "./packages/workflow" },
     { "path": "./packages/core" },
     { "path": "./packages/renderer-remotion" },
