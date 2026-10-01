@@ -5,6 +5,7 @@ import { resolve } from 'node:path'
 import { WhisperCppTranscriber } from '@videooo/transcriber-whisper-cpp'
 import { renderRemotionVideo } from '@videooo/renderer-remotion'
 import { ManimWorker } from '@videooo/manim-worker'
+import { runSelfUpdate } from './update.js'
 import {
   DEFAULT_VIDEO_STYLE,
   ProjectStore,
@@ -92,6 +93,12 @@ async function main(): Promise<void> {
       return
     case 'previs':
       await handlePrevis(args)
+      return
+    case 'update':
+      if (args.length > 0) {
+        throw new Error('Usage: videooo update')
+      }
+      runSelfUpdate()
       return
     default:
       throw new Error(`Unknown command: ${command}`)
@@ -1334,6 +1341,7 @@ function printUsage(): void {
 Usage:
   videooo --version
   videooo --help
+  videooo update
   videooo init <topic>
   videooo status
   videooo research begin
