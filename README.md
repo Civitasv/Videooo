@@ -143,7 +143,7 @@ The installed plugin, CLI, skills, and future renderers are shared. They are not
 
 ## Current milestone
 
-M4 is implemented:
+M5 closes the V1 production loop:
 
 ```text
 Topic
@@ -153,17 +153,21 @@ Topic
   -> Transcript / forced alignment
   -> Semantic storyboard
   -> Visual Router
-      -> Remotion: title / typography / code / diagram / summary
-      -> Manim: equation / plot / vector / algorithm
-  -> cached Manim scene clips
-  -> Remotion final timeline + human narration
+      -> Remotion
+      -> Manim
   -> H.264 draft.mp4
-  -> QA boundary
+  -> deterministic QA evidence
+  -> Codex visual / semantic / continuity review
+  -> scene-scoped repair overlays
+  -> rerender only what changed
+  -> accepted final.mp4
 ```
 
-The storyboard stays declarative. Codex does not write per-project React or arbitrary Python.
+QA is evidence-driven rather than score-driven. Videooo extracts real frames from the rendered video and owns structural checks; Codex inspects those frames and submits scene-scoped findings.
 
-Videooo generates Manim source from fixed templates, renders only the scenes that need Manim, then embeds those silent clips inside the final Remotion composition. Human narration remains one global audio track.
+Repairs are non-destructive overlays. The approved script, narration, alignment, original storyboard, and base Scene IR remain unchanged. Changed Manim scenes invalidate only their own cache key.
+
+The automatic QA loop is capped at three repair rounds before remaining blockers are surfaced to the user.
 
 ## CLI
 
@@ -207,6 +211,23 @@ videooo manim render-all
 videooo render
 # automatically renders missing Manim scenes
 # default: .videooo/renders/draft.mp4
+
+videooo qa prepare
+videooo qa evidence
+videooo qa import review.json
+videooo qa report
+
+# when a structural blocker requires a fresh render:
+videooo qa rerender
+videooo render
+
+# when blocking visual findings exist:
+videooo qa repair import repair.json
+videooo render
+
+# when the report passes:
+videooo qa accept
+# final: .videooo/renders/final.mp4
 ```
 
 Codex normally calls these commands through Videooo skills. You can also use them directly.
@@ -256,6 +277,7 @@ Remotion owns the final composition and global timeline. Manim is a specialized 
 - `packages/storyboard` — semantic storyboard validation, mixed Scene IR compilation, and frame planning.
 - `packages/visual-router` — deterministic Remotion/Manim routing.
 - `packages/manim-worker` — fixed-template Manim source generation, local rendering, and cache keys.
+- `packages/qa` — deterministic QA evidence, report merging, and non-destructive repair overlays.
 - `packages/renderer-remotion` — fixed Remotion component library and real H.264 renderer.
 - `packages/renderer-manim` — Manim renderer capability marker.
 - `docs/specs/v1.md` — full V1 product specification.
@@ -263,6 +285,7 @@ Remotion owns the final composition and global timeline. Manim is a specialized 
 - `docs/specs/m2-narration-alignment.md` — human narration and alignment specification.
 - `docs/specs/m3-storyboard-remotion.md` — storyboard, Scene IR, and first-render specification.
 - `docs/specs/m4-manim-router.md` — mixed Remotion/Manim routing specification.
+- `docs/specs/m5-visual-qa.md` — visual QA and scene-scoped repair specification.
 
 ## Development
 
