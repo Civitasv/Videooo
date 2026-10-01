@@ -3,6 +3,7 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { WhisperCppTranscriber } from '@videooo/transcriber-whisper-cpp'
+import { renderRemotionVideo } from '@videooo/renderer-remotion'
 import {
   DEFAULT_VIDEO_STYLE,
   ProjectStore,
@@ -66,6 +67,9 @@ async function main(): Promise<void> {
     case 'scenes':
       await handleScenes(args)
       return
+    case 'render':
+      await handleRender(args)
+      return
     default:
       throw new Error(`Unknown command: ${command}`)
   }
@@ -113,6 +117,8 @@ async function handleStatus(): Promise<void> {
         storyboardId: project.storyboardId ?? null,
         styleId: project.styleId ?? null,
         sceneCount: project.sceneCount ?? 0,
+        hasRender: await store.hasRenderManifest(),
+        renderId: project.renderId ?? null,
       },
       null,
       2,
@@ -534,6 +540,84 @@ async function handleScenes(args: string[]): Promise<void> {
   throw new Error('Usage: videooo scenes <list|show <scene-id>>')
 }
 
+async function handleRender(args: string[]): Promise<void> {
+  const store = new ProjectStore()
+  let project = await store.loadProject()
+
+  if (project.stage === 'storyboarded') {
+    project = transitionProject(project, 'rendering')
+    await store.saveProject(project)
+  } else if (project.stage !== 'rendering') {
+    throw new Error(
+      `Render requires stage "storyboarded" or "rendering"; current stage is "${project.stage}"`,
+    )
+  }
+
+  if (project.storyboardId === undefined || project.alignmentId === undefined) {
+    throw new Error('Project is missing storyboard/alignment metadata')
+  }
+
+  const storyboard = await store.loadStoryboard()
+  const alignment = await store.loadAlignment()
+  const narration = await store.loadNarration()
+  const style = await store.loadStyle()
+  const scenes = await store.listScenes()
+
+  if (storyboard.id !== project.storyboardId) {
+    throw new Error('Storyboard artifact does not match project metadata')
+  }
+  if (alignment.id !== project.alignmentId) {
+    throw new Error('Alignment artifact does not match project metadata')
+  }
+  if (scenes.length !== project.sceneCount) {
+    throw new Error('Compiled Scene IR count does not match project metadata')
+  }
+
+  const requestedOutput = optionValue(args, '--output')
+  const outputLocation =
+    requestedOutput === undefined
+      ? store.draftRenderPath
+      : resolve(process.cwd(), requestedOutput)
+
+  const result = await renderRemotionVideo({
+    scenes,
+    style,
+    video: storyboard.video,
+    durationMs: alignment.durationMs,
+    narrationSourcePath: store.narrationSourcePath(narration),
+    workspaceDirectory: store.renderWorkspaceDirectory,
+    outputLocation,
+  })
+
+  const manifest = {
+    schemaVersion: 1 as const,
+    id: `render-${storyboard.id}`,
+    projectId: project.id,
+    storyboardId: storyboard.id,
+    alignmentId: alignment.id,
+    createdAt: new Date().toISOString(),
+    renderer: 'remotion' as const,
+    outputPath:
+      requestedOutput === undefined ? 'renders/draft.mp4' : requestedOutput,
+    width: storyboard.video.width,
+    height: storyboard.video.height,
+    fps: storyboard.video.fps,
+    durationMs: alignment.durationMs,
+    codec: 'h264' as const,
+  }
+
+  await store.saveRenderManifest(manifest)
+  project = transitionProject(
+    { ...project, renderId: manifest.id },
+    'qa',
+  )
+  await store.saveProject(project)
+
+  console.log(
+    `Rendered ${result.frameCount} frame(s) to ${result.outputLocation}. Project is ready for QA.`,
+  )
+}
+
 async function readJsonFile(path: string): Promise<unknown> {
   return JSON.parse(
     await readFile(resolve(process.cwd(), path), 'utf8'),
@@ -598,7 +682,8 @@ Usage:
   videooo storyboard show
   videooo storyboard compile
   videooo scenes list
-  videooo scenes show <scene-id>`)
+  videooo scenes show <scene-id>
+  videooo render [--output <file>]`)
 }
 
 try {
