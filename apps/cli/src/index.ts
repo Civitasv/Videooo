@@ -331,7 +331,8 @@ async function handleAlign(args: string[]): Promise<void> {
       `Alignment requires stage "recorded"; current stage is "${project.stage}"`,
     )
   }
-  if (project.approvedScriptVersionId === undefined) {
+  const approvedScriptVersionId = project.approvedScriptVersionId
+  if (approvedScriptVersionId === undefined) {
     throw new Error('Project has no approved script version')
   }
 
@@ -385,7 +386,7 @@ async function handleAlign(args: string[]): Promise<void> {
   }
 
   const script = await store.loadScriptVersionById(
-    project.approvedScriptVersionId,
+    approvedScriptVersionId,
   )
   const alignment = buildNarrationAlignment(script, transcript, {
     acceptedLowCoverage: args.includes('--accept-low-coverage'),
