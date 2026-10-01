@@ -650,10 +650,14 @@ export function parseQaRepairOverlay(
             continue
           }
           const finding = findings.get(findingId)
+          if (finding?.category === 'structural') {
+            issues.push(
+              `${path}.finding "${findingId}" is structural and cannot be fixed by a scene overlay`,
+            )
+          }
           if (
             finding !== undefined &&
-            finding.sceneId !== raw.sceneId &&
-            finding.sceneId !== '__video__'
+            finding.sceneId !== raw.sceneId
           ) {
             issues.push(
               `${path}.finding "${findingId}" belongs to scene "${finding.sceneId}"`,
