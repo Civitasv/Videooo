@@ -5,7 +5,7 @@ import type {
   VideoStyle,
 } from '@videooo/domain'
 
-export interface VideoooRenderProps {
+export interface VideoooRenderProps extends Record<string, unknown> {
   scenes: SceneIR[]
   framePlans: SceneFramePlan[]
   style: VideoStyle
