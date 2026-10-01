@@ -100,9 +100,13 @@ If alignment coverage is below the quality gate, discuss the deviations with the
 
 Run `videooo status` and, when useful, `videooo alignment show`.
 
-Report duration, coverage, significant deviations, and whether section timing is available. The project is now ready for M3 storyboard generation.
+Report duration, coverage, significant deviations, and section timing. Then use the `storyboard` skill to create, import, and compile the M3 storyboard.
 
-### storyboarded / rendering / qa / done
+### storyboarded
+
+The Scene IR is compiled. Use the implemented renderer capability when available. Do not generate a separate per-project React application.
+
+### rendering / qa / done
 
 Follow the implemented capabilities available in the current Videooo version. Never fabricate missing milestone behavior.
 
