@@ -124,23 +124,27 @@ The installed plugin, CLI, skills, and future renderers are shared. They are not
 
 ## Current milestone
 
-M2 is implemented:
+M3 is implemented:
 
 ```text
 Topic
   -> Research Pack
-  -> Draft Script
-  -> Human + AI revisions
-  -> Explicit approved script
+  -> Collaborative approved script
   -> Human narration
   -> Local/provider-neutral transcript
   -> Forced alignment
-  -> Word/phrase timing + deviations + pauses
+  -> Semantic storyboard
+  -> Declarative Scene IR
+  -> Shared Remotion runtime
+  -> H.264 draft.mp4
+  -> QA boundary
 ```
 
-The main Codex entry point is the packaged `videooo` skill. It routes research/script work and, after approval, delegates recording/transcription/alignment to the `narration` skill.
+After alignment, Codex uses the packaged `storyboard` skill to plan five deterministic visual families: title, typography, code, diagram, and summary.
 
-After state becomes `aligned`, Videooo is ready for M3: storyboard and Scene IR generation from the real narration timeline.
+Video projects do not get their own React application. The installed Videooo runtime owns the common component library, design system, narration composition, and Remotion server renderer.
+
+M4 will add Manim routing for mathematical/scientific scenes that need richer spatial animation.
 
 ## CLI
 
@@ -171,6 +175,14 @@ videooo transcript show
 videooo align --provider whisper-cpp --model /path/to/model.bin
 videooo align --from-transcript
 videooo alignment show
+
+videooo storyboard import storyboard.json
+videooo storyboard show
+videooo storyboard compile
+videooo scenes list
+
+videooo render
+# default: .videooo/renders/draft.mp4
 ```
 
 Codex normally calls these commands through Videooo skills. You can also use them directly.
@@ -217,11 +229,13 @@ Remotion owns the final composition and global timeline. Manim is a specialized 
 - `packages/workflow` — production state machine and validators.
 - `packages/project-store` — filesystem project persistence.
 - `packages/core` — stable public facade.
-- `packages/renderer-remotion` — Remotion adapter boundary.
+- `packages/storyboard` — semantic storyboard validation, Scene IR compilation, and frame planning.
+- `packages/renderer-remotion` — fixed Remotion component library and real H.264 renderer.
 - `packages/renderer-manim` — Manim adapter boundary.
 - `docs/specs/v1.md` — full V1 product specification.
 - `docs/specs/m1.5-codex-distribution.md` — Codex distribution specification.
 - `docs/specs/m2-narration-alignment.md` — human narration and alignment specification.
+- `docs/specs/m3-storyboard-remotion.md` — storyboard, Scene IR, and first-render specification.
 
 ## Development
 
